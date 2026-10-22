@@ -32,40 +32,7 @@ function getDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-const initialHabits: Habit[] = [
-  {
-    id: "1",
-    title: "Drink water",
-    subtitle: "8 glasses a day",
-    emoji: "💧",
-    completed: false,
-    completedDates: [],
-  },
-  {
-    id: "2",
-    title: "Read a book",
-    subtitle: "20 minutes",
-    emoji: "📚",
-    completed: false,
-    completedDates: [],
-  },
-  {
-    id: "3",
-    title: "Exercise",
-    subtitle: "30 minutes",
-    emoji: "🏃",
-    completed: false,
-    completedDates: [],
-  },
-  {
-    id: "4",
-    title: "Meditate",
-    subtitle: "10 minutes",
-    emoji: "🧘",
-    completed: false,
-    completedDates: [],
-  },
-];
+const initialHabits: Habit[] = [];
 
 const HabitContext = createContext<HabitContextType | undefined>(
   undefined
@@ -78,7 +45,7 @@ export function HabitProvider({ children }: { children: ReactNode }) {
   // Load and migrate saved habits.
   useEffect(() => {
     let active = true;
-
+    
     async function loadHabits() {
       try {
         const saved = await AsyncStorage.getItem(STORAGE_KEY);
