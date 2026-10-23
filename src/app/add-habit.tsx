@@ -1,20 +1,31 @@
-
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
   Alert,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  Text,
+  View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
-import { useHabits, HabitFrequency } from "../context/HabitContext";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Check,
+  Clock3,
+  Sparkles,
+  Trash2,
+} from "lucide-react-native";
 
-const emojis = ["💧", "📚", "🏃", "🧘", "💪", "🥗", "😴", "✍️"];
+import { AppButton, AppCard, AppInput } from "../components/ui";
+import { colors, spacing } from "../theme";
+import { useHabits, HabitFrequency } from "../context/HabitContext";
+import styles from "../styles/add-habit.styles";
+
+const emojis = ["⭐", "💧", "📚", "🏃", "🧘", "💪", "🥗", "😴", "✍️", "🎯", "🧠", "🚶"];
 
 const weekDays = [
   { label: "Sun", value: 0 },
@@ -29,11 +40,36 @@ const weekDays = [
 const weekdayValues = [1, 2, 3, 4, 5];
 const allDayValues = [0, 1, 2, 3, 4, 5, 6];
 
+const frequencyOptions: {
+  label: string;
+  value: HabitFrequency;
+  description: string;
+}[] = [
+  {
+    label: "Daily",
+    value: "daily",
+    description: "Build consistency every day",
+  },
+  {
+    label: "Weekdays",
+    value: "weekdays",
+    description: "Monday through Friday",
+  },
+  {
+    label: "Custom",
+    value: "custom",
+    description: "Choose your own days",
+  },
+];
+
 export default function AddHabitScreen() {
+  const insets = useSafeAreaInsets();
+
   const { habits, addHabit, updateHabit, deleteHabit } = useHabits();
 
   const { id } = useLocalSearchParams<{ id?: string }>();
   const habitId = Array.isArray(id) ? id[0] : id;
+
   const isEditing = typeof habitId === "string" && habitId.length > 0;
 
   const existingHabit = isEditing
@@ -44,9 +80,7 @@ export default function AddHabitScreen() {
   const [subtitle, setSubtitle] = useState("");
   const [emoji, setEmoji] = useState("⭐");
   const [frequency, setFrequency] = useState<HabitFrequency>("daily");
-  const [selectedDays, setSelectedDays] = useState<number[]>([
-    0, 1, 2, 3, 4, 5, 6,
-  ]);
+  const [selectedDays, setSelectedDays] = useState<number[]>(allDayValues);
 
   useEffect(() => {
     if (!existingHabit) return;
@@ -58,21 +92,21 @@ export default function AddHabitScreen() {
     setSelectedDays(existingHabit.scheduledDays);
   }, [existingHabit]);
 
-  const handleFrequencyChange = (newFreq: HabitFrequency) => {
-    setFrequency(newFreq);
+  const handleFrequencyChange = (newFrequency: HabitFrequency) => {
+    setFrequency(newFrequency);
 
-    if (newFreq === "daily") {
+    if (newFrequency === "daily") {
       setSelectedDays(allDayValues);
-    } else if (newFreq === "weekdays") {
+    } else if (newFrequency === "weekdays") {
       setSelectedDays(weekdayValues);
     }
   };
 
   const toggleDay = (day: number) => {
-    setSelectedDays((prev) =>
-      prev.includes(day)
-        ? prev.filter((d) => d !== day)
-        : [...prev, day].sort((a, b) => a - b)
+    setSelectedDays((previous) =>
+      previous.includes(day)
+        ? previous.filter((value) => value !== day)
+        : [...previous, day].sort((a, b) => a - b)
     );
   };
 
@@ -80,7 +114,10 @@ export default function AddHabitScreen() {
     const habitTitle = title.trim();
 
     if (!habitTitle) {
-      Alert.alert("Habit name required", "Please enter a habit name.");
+      Alert.alert(
+        "Habit name required",
+        "Please enter a name for your habit."
+      );
       return;
     }
 
@@ -128,7 +165,10 @@ export default function AddHabitScreen() {
       "Delete habit?",
       `Are you sure you want to delete "${existingHabit.title}"? This will also remove its completion history.`,
       [
-        { text: "Cancel", style: "cancel" },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
         {
           text: "Delete",
           style: "destructive",
@@ -141,193 +181,264 @@ export default function AddHabitScreen() {
     );
   };
 
-  const inputClass =
-    "rounded-[14px] border border-[#E6E8F0] bg-white px-[15px] py-[15px] text-[15px] text-[#20243A]";
-
-  const labelClass =
-    "mb-3 mt-[22px] text-[15px] font-semibold text-[#292D40]";
+  const scheduleDescription =
+    frequency === "daily"
+      ? "Scheduled every day of the week."
+      : frequency === "weekdays"
+        ? "Scheduled Monday through Friday."
+        : `${selectedDays.length} of 7 days selected.`;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F7F8FC]">
+    <View style={styles.screen}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={colors.background}
+      />
+
       <KeyboardAvoidingView
-        className="flex-1"
+        style={styles.keyboard}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ padding: 22, paddingBottom: 40 }}
-          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingTop: Math.max(insets.top, spacing.md),
+              paddingBottom: Math.max(insets.bottom, spacing.xxl),
+            },
+          ]}
         >
-          <Text className="mt-3 text-[26px] font-bold text-[#20243A]">
-            {isEditing ? "Edit Habit" : "Create a new habit"}
-          </Text>
+          {/* Header */}
+          <View style={styles.header}>
+            <Pressable
+              onPress={() => router.back()}
+              style={styles.backButton}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <ArrowLeft size={21} color={colors.text} />
+            </Pressable>
 
-          <Text className="mb-[15px] mt-[9px] text-sm leading-[21px] text-[#85899B]">
-            Start small. Stay consistent. Build a better you.
-          </Text>
-
-          <Text className={labelClass}>Choose an icon</Text>
-
-          <View className="flex-row flex-wrap gap-3">
-            {emojis.map((item) => (
-              <Pressable
-                key={item}
-                onPress={() => setEmoji(item)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: emoji === item }}
-                className={`h-[54px] w-[54px] items-center justify-center rounded-[15px] border bg-white ${
-                  emoji === item
-                    ? "border-2 border-[#5965C9] bg-[#E9EBFF]"
-                    : "border-[#E6E8F0]"
-                }`}
-              >
-                <Text className="text-[25px]">{item}</Text>
-              </Pressable>
-            ))}
+            <View style={styles.headerText}>
+              <Text style={styles.screenTitle}>
+                {isEditing ? "Edit Habit" : "Create a habit"}
+              </Text>
+              <Text style={styles.screenSubtitle}>
+                Small steps lead to meaningful change.
+              </Text>
+            </View>
           </View>
 
-          <Text className={labelClass}>Habit name *</Text>
-
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="e.g. Drink more water"
-            placeholderTextColor="#999EAD"
-            className={inputClass}
-            maxLength={60}
-            returnKeyType="next"
-          />
-
-          <Text className={labelClass}>Daily goal or description</Text>
-
-          <TextInput
-            value={subtitle}
-            onChangeText={setSubtitle}
-            placeholder="e.g. Drink 8 glasses"
-            placeholderTextColor="#999EAD"
-            className={inputClass}
-            maxLength={100}
-            returnKeyType="done"
-          />
-
-          <Text className={labelClass}>How often?</Text>
-
-          <View className="flex-row gap-2">
-            {(
-              [
-                { label: "Daily", value: "daily" },
-                { label: "Weekdays", value: "weekdays" },
-                { label: "Custom", value: "custom" },
-              ] as const
-            ).map((option) => {
-              const selected = frequency === option.value;
-
-              return (
-                <Pressable
-                  key={option.value}
-                  onPress={() => handleFrequencyChange(option.value)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  className={`flex-1 items-center rounded-xl border px-1 py-[13px] ${
-                    selected
-                      ? "border-[#5965C9] bg-[#E9EBFF]"
-                      : "border-[#E6E8F0] bg-white"
-                  }`}
-                >
-                  <Text
-                    className={`text-[13px] font-semibold ${
-                      selected ? "text-[#5965C9]" : "text-[#73788D]"
-                    }`}
-                  >
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {frequency === "weekdays" && (
-            <Text className="mt-[10px] text-xs text-[#85899B]">
-              Scheduled Monday through Friday.
-            </Text>
-          )}
-
-          {frequency === "daily" && (
-            <Text className="mt-[10px] text-xs text-[#85899B]">
-              Scheduled every day of the week.
-            </Text>
-          )}
-
-          {frequency === "custom" && (
-            <>
-              <Text className={labelClass}>Choose your days</Text>
-
-              <View className="flex-row justify-between gap-[5px]">
-                {weekDays.map((day) => {
-                  const selected = selectedDays.includes(day.value);
-
-                  return (
-                    <Pressable
-                      key={day.value}
-                      onPress={() => toggleDay(day.value)}
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: selected }}
-                      accessibilityLabel={day.label}
-                      className={`flex-1 items-center rounded-xl border py-3 ${
-                        selected
-                          ? "border-[#5965C9] bg-[#5965C9]"
-                          : "border-[#E6E8F0] bg-white"
-                      }`}
-                    >
-                      <Text
-                        className={`text-[11px] font-semibold ${
-                          selected ? "text-white" : "text-[#73788D]"
-                        }`}
-                      >
-                        {day.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+          {/* Habit details */}
+          <AppCard style={styles.sectionCard}>
+            <View style={styles.sectionHeading}>
+              <View style={styles.sectionIcon}>
+                <Sparkles size={20} color={colors.primary} />
               </View>
 
-              <Text className="mt-[10px] text-xs text-[#85899B]">
-                {selectedDays.length} of 7 days selected
-              </Text>
-            </>
-          )}
+              <View>
+                <Text style={styles.sectionTitle}>Habit details</Text>
+                <Text style={styles.sectionDescription}>
+                  Give your new habit a name and an icon.
+                </Text>
+              </View>
+            </View>
 
-          <Pressable
+            <Text style={styles.fieldLabel}>Choose an icon</Text>
+
+            <View style={styles.emojiGrid}>
+              {emojis.map((item) => {
+                const selected = emoji === item;
+
+                return (
+                  <Pressable
+                    key={item}
+                    onPress={() => setEmoji(item)}
+                    style={[
+                      styles.emojiOption,
+                      selected && styles.emojiOptionSelected,
+                    ]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Choose ${item} icon`}
+                  >
+                    <Text style={styles.emojiText}>{item}</Text>
+
+                    {selected && (
+                      <View style={styles.selectedCheck}>
+                        <Check size={12} color={colors.surface} />
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <AppInput
+                label="Habit name"
+                placeholder="e.g. Read for 20 minutes"
+                value={title}
+                onChangeText={setTitle}
+                maxLength={60}
+                returnKeyType="next"
+                accessibilityLabel="Habit name"
+              />
+            </View>
+
+            <AppInput
+              label="Description (optional)"
+              placeholder="e.g. Read before going to bed"
+              value={subtitle}
+              onChangeText={setSubtitle}
+              maxLength={120}
+              returnKeyType="done"
+              accessibilityLabel="Habit description"
+            />
+          </AppCard>
+
+          {/* Schedule */}
+          <AppCard style={styles.sectionCard}>
+            <View style={styles.sectionHeading}>
+              <View style={styles.sectionIcon}>
+                <CalendarDays size={20} color={colors.primary} />
+              </View>
+
+              <View>
+                <Text style={styles.sectionTitle}>Your schedule</Text>
+                <Text style={styles.sectionDescription}>
+                  Decide how often you want to do this habit.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.frequencyList}>
+              {frequencyOptions.map((option) => {
+                const selected = frequency === option.value;
+
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => handleFrequencyChange(option.value)}
+                    style={[
+                      styles.frequencyOption,
+                      selected && styles.frequencyOptionSelected,
+                    ]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <View
+                      style={[
+                        styles.frequencyRadio,
+                        selected && styles.frequencyRadioSelected,
+                      ]}
+                    >
+                      {selected && <View style={styles.frequencyRadioDot} />}
+                    </View>
+
+                    <View style={styles.frequencyText}>
+                      <Text style={styles.frequencyLabel}>
+                        {option.label}
+                      </Text>
+                      <Text style={styles.frequencyDescription}>
+                        {option.description}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {frequency === "custom" && (
+              <>
+                <Text style={[styles.fieldLabel, styles.customDaysLabel]}>
+                  Choose your days
+                </Text>
+
+                <View style={styles.dayList}>
+                  {weekDays.map((day) => {
+                    const selected = selectedDays.includes(day.value);
+
+                    return (
+                      <Pressable
+                        key={day.value}
+                        onPress={() => toggleDay(day.value)}
+                        style={[
+                          styles.dayOption,
+                          selected && styles.dayOptionSelected,
+                        ]}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: selected }}
+                        accessibilityLabel={day.label}
+                      >
+                        <Text
+                          style={[
+                            styles.dayLabel,
+                            selected && styles.dayLabelSelected,
+                          ]}
+                        >
+                          {day.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            <Text style={styles.helperText}>{scheduleDescription}</Text>
+          </AppCard>
+
+          {/* Preview */}
+          <AppCard style={styles.previewCard}>
+            <Text style={styles.previewLabel}>HABIT PREVIEW</Text>
+
+            <View style={styles.previewRow}>
+              <View style={styles.previewEmoji}>
+                <Text style={styles.previewEmojiText}>{emoji}</Text>
+              </View>
+
+              <View style={styles.frequencyText}>
+                <Text style={styles.previewTitle}>
+                  {title.trim() || "Your new habit"}
+                </Text>
+                <Text style={styles.previewSubtitle}>
+                  {subtitle.trim() || scheduleDescription}
+                </Text>
+              </View>
+            </View>
+          </AppCard>
+
+          {/* Actions */}
+          <AppButton
+            title={isEditing ? "Update Habit" : "Save Habit"}
             onPress={handleSave}
-            className="mt-8 items-center rounded-[15px] bg-[#5965C9] p-[17px]"
-          >
-            <Text className="text-base font-bold text-white">
-              {isEditing ? "Update Habit" : "Save Habit"}
-            </Text>
-          </Pressable>
+            icon={<Check size={19} color={colors.surface} />}
+            style={styles.saveButton}
+          />
 
           <Pressable
             onPress={() => router.back()}
-            className="mt-[5px] items-center p-[15px]"
+            style={styles.cancelButton}
+            accessibilityRole="button"
           >
-            <Text className="text-[15px] font-semibold text-[#73788D]">
-              Cancel
-            </Text>
+            <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
 
           {isEditing && existingHabit && (
             <Pressable
               onPress={handleDelete}
-              className="mt-3 items-center rounded-[15px] bg-[#FDECEC] p-4"
+              style={styles.deleteButton}
+              accessibilityRole="button"
             >
-              <Text className="text-[15px] font-bold text-[#C62828]">
-                Delete Habit
-              </Text>
+              <Trash2 size={17} color={colors.danger} />
+              <Text style={styles.deleteText}>Delete Habit</Text>
             </Pressable>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }

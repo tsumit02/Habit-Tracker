@@ -1,18 +1,36 @@
-
 import {
-  SafeAreaView,
   ScrollView,
   StatusBar,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Circle } from "react-native-svg";
+import {
+  CalendarDays,
+  ChartNoAxesCombined,
+  Check,
+  Flame,
+  Target,
+  TrendingUp,
+  Trophy,
+} from "lucide-react-native";
+
+import { AppCard } from "../../components/ui";
 import { useHabits } from "../../context/HabitContext";
+import { colors, spacing } from "../../theme";
+import styles from "../../styles/progress.styles";
+
+const RING_SIZE = 116;
+const RING_STROKE = 10;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 function getDateKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
+
   return `${year}-${month}-${day}`;
 }
 
@@ -34,32 +52,66 @@ function getLastSevenDays() {
   });
 }
 
+function ProgressRing({ percentage }: { percentage: number }) {
+  const safePercentage = Math.min(100, Math.max(0, percentage));
+
+  return (
+    <View style={styles.ringContainer}>
+      <Svg
+        width={RING_SIZE}
+        height={RING_SIZE}
+        viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
+      >
+        <Circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RING_RADIUS}
+          stroke={colors.primaryLight}
+          strokeWidth={RING_STROKE}
+          fill="none"
+        />
+
+        <Circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RING_RADIUS}
+          stroke={colors.primary}
+          strokeWidth={RING_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={`${RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
+          strokeDashoffset={
+            RING_CIRCUMFERENCE * (1 - safePercentage / 100)
+          }
+          rotation={-90}
+          origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
+          fill="none"
+        />
+      </Svg>
+
+      <View style={styles.ringCenter}>
+        <Text style={styles.ringPercentage}>{safePercentage}%</Text>
+        <Text style={styles.ringCaption}>complete</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function ProgressScreen() {
   const insets = useSafeAreaInsets();
   const { habits } = useHabits();
 
   const days = getLastSevenDays();
   const todayKey = getDateKey(new Date());
+  const totalHabits = habits.length;
 
   const completedToday = habits.filter((habit) =>
     habit.completedDates.includes(todayKey)
   ).length;
 
-  const totalHabits = habits.length;
-
   const completionRate =
     totalHabits === 0
       ? 0
       : Math.round((completedToday / totalHabits) * 100);
-
-  const weeklyCompletions = habits.reduce(
-    (total, habit) =>
-      total +
-      days.filter((day) =>
-        habit.completedDates.includes(day.key)
-      ).length,
-    0
-  );
 
   const dailyCounts = days.map((day) => ({
     ...day,
@@ -68,268 +120,384 @@ export default function ProgressScreen() {
     ).length,
   }));
 
-  const maxCount = Math.max(totalHabits, 1);
+  const weeklyCompletions = dailyCounts.reduce(
+    (total, day) => total + day.count,
+    0
+  );
+
+  const maxCount = Math.max(
+    ...dailyCounts.map((day) => day.count),
+    1
+  );
+
+  const currentStreak = (dates: string[]) => {
+    let streak = 0;
+    const date = new Date();
+
+    if (!dates.includes(todayKey)) {
+      date.setDate(date.getDate() - 1);
+    }
+
+    while (dates.includes(getDateKey(date))) {
+      streak += 1;
+      date.setDate(date.getDate() - 1);
+    }
+
+    return streak;
+  };
+
+  const bestCurrentStreak = Math.max(
+    0,
+    ...habits.map((habit) => currentStreak(habit.completedDates))
+  );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F7F8FC]">
+    <View
+      style={[
+        styles.screen,
+        { paddingTop: Math.max(insets.top, spacing.sm) },
+      ]}
+    >
       <StatusBar
         barStyle="dark-content"
-        backgroundColor="#F7F8FC"
+        backgroundColor={colors.background}
       />
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{
-          paddingHorizontal: 22,
-          paddingTop: Math.max(insets.top, 12) + 8,
-          paddingBottom: 36,
-        }}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, spacing.xxl) },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <View className="mb-7">
-          <View className="flex-row items-center">
-            <Text className="text-[30px] font-extrabold tracking-tight text-[#20243A]">
-              Your Progress
-            </Text>
-            <Text className="ml-2 text-[27px]">📈</Text>
+        <View style={styles.header}>
+          <View style={styles.titleRow}>
+            <Text style={styles.screenTitle}>Your Progress</Text>
+
+            <ChartNoAxesCombined
+              size={25}
+              color={colors.primary}
+              strokeWidth={2.5}
+              style={styles.headerIcon}
+            />
           </View>
 
-          <Text className="mt-2 text-sm text-[#858BA1]">
+          <Text style={styles.subtitle}>
             Every small step counts.
           </Text>
         </View>
 
         {/* Today's completion */}
-        <View className="mb-5 overflow-hidden rounded-[28px] bg-[#5965C9] p-6">
-          <View className="mb-5 flex-row items-center justify-between">
-            <View className="rounded-full bg-white/15 px-3 py-2">
-              <Text className="text-[10px] font-bold tracking-[1.4px] text-white">
-                TODAY'S COMPLETION
-              </Text>
-            </View>
+        <AppCard style={[styles.card, styles.overviewCard]}>
+          <View style={styles.decorationTop} />
+          <View style={styles.decorationBottom} />
 
-            <Text className="text-2xl">
-              {completionRate === 100 && totalHabits > 0
-                ? "🎉"
-                : "✨"}
-            </Text>
-          </View>
-
-          <View className="mb-5 flex-row items-end justify-between">
-            <View className="flex-1 pr-3">
-              <Text className="text-[44px] font-extrabold text-white">
-                {completionRate}%
-              </Text>
-
-              <Text className="mt-1 text-sm leading-5 text-[#E4E7FF]">
-                {completedToday} of {totalHabits} habits completed
-              </Text>
-            </View>
-
-            <Text className="mb-2 text-sm font-semibold text-[#E4E7FF]">
-              {completionRate === 100 && totalHabits > 0
-                ? "All done!"
-                : "Keep going"}
-            </Text>
-          </View>
-
-          <View className="h-3 overflow-hidden rounded-full bg-[#858DE0]">
+          <View style={styles.sectionHeading}>
             <View
-              className="h-full rounded-full bg-white"
-              style={{ width: `${completionRate}%` }}
-            />
+              style={[
+                styles.sectionIcon,
+                styles.sectionIconPurple,
+              ]}
+            >
+              <CalendarDays size={20} color={colors.primary} />
+            </View>
+
+            <View style={styles.sectionText}>
+              <Text style={styles.sectionTitle}>
+                Today's completion
+              </Text>
+              <Text style={styles.sectionSubtitle}>
+                Your daily goals at a glance
+              </Text>
+            </View>
           </View>
 
-          <Text className="mt-5 text-xs leading-5 text-[#E4E7FF]">
-            Progress isn't about perfection. It's about showing up.
-          </Text>
-        </View>
+          <View style={styles.overviewBody}>
+            <ProgressRing percentage={completionRate} />
+
+            <View style={styles.overviewDetails}>
+              <Text style={styles.overviewCount}>
+                {completedToday} of {totalHabits}
+              </Text>
+
+              <Text style={styles.overviewAccent}>
+                habits completed
+              </Text>
+
+              <Text style={styles.overviewMessage}>
+                {totalHabits > 0 && completionRate === 100
+                  ? "Amazing! You've completed every habit today. 🎉"
+                  : "Keep going! Every little action matters. 💪"}
+              </Text>
+            </View>
+          </View>
+        </AppCard>
 
         {/* Statistics */}
-        <View className="mb-6 flex-row gap-3">
-          <View className="flex-1 rounded-[23px] border border-[#EAECF4] bg-white p-4">
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#EAF7EE]">
-              <Text className="text-xl">✓</Text>
+        <View style={styles.statsRow}>
+          <AppCard padding={spacing.md} style={styles.statCard}>
+            <View
+              style={[
+                styles.statIcon,
+                styles.sectionIconGreen,
+              ]}
+            >
+              <Check
+                size={22}
+                color={colors.success}
+                strokeWidth={3}
+              />
             </View>
 
-            <Text className="mt-4 text-[29px] font-extrabold text-[#292D40]">
+            <Text style={styles.statValue}>
               {weeklyCompletions}
             </Text>
 
-            <Text className="mt-1 text-xs leading-5 text-[#858BA1]">
+            <Text style={styles.statLabel}>
               Completions this week
             </Text>
-          </View>
+          </AppCard>
 
-          <View className="flex-1 rounded-[23px] border border-[#EAECF4] bg-white p-4">
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#EAECFF]">
-              <Text className="text-xl">🎯</Text>
+          <AppCard padding={spacing.md} style={styles.statCard}>
+            <View
+              style={[
+                styles.statIcon,
+                styles.sectionIconOrange,
+              ]}
+            >
+              <Flame
+                size={22}
+                color={colors.orange}
+                strokeWidth={2.4}
+              />
             </View>
 
-            <Text className="mt-4 text-[29px] font-extrabold text-[#292D40]">
+            <Text style={styles.statValue}>
+              {bestCurrentStreak}
+            </Text>
+
+            <Text style={styles.statLabel}>
+              Best current streak
+            </Text>
+          </AppCard>
+
+          <AppCard padding={spacing.md} style={styles.statCard}>
+            <View
+              style={[
+                styles.statIcon,
+                styles.sectionIconPurple,
+              ]}
+            >
+              <Target
+                size={22}
+                color={colors.primary}
+                strokeWidth={2.4}
+              />
+            </View>
+
+            <Text style={styles.statValue}>
               {totalHabits}
             </Text>
 
-            <Text className="mt-1 text-xs leading-5 text-[#858BA1]">
+            <Text style={styles.statLabel}>
               Total habits
             </Text>
-          </View>
+          </AppCard>
         </View>
 
-        {/* Weekly activity */}
-        <View className="mb-5 rounded-[26px] border border-[#EAECF4] bg-white p-5">
-          <View className="mb-6">
-            <Text className="text-xl font-extrabold text-[#292D40]">
-              Weekly activity
-            </Text>
+        {/* Weekly activity chart */}
+        <AppCard style={styles.card}>
+          <View style={styles.sectionHeading}>
+            <View
+              style={[
+                styles.sectionIcon,
+                styles.sectionIconPurple,
+              ]}
+            >
+              <TrendingUp size={21} color={colors.primary} />
+            </View>
 
-            <Text className="mt-1.5 text-sm text-[#858BA1]">
-              Your last 7 days at a glance
-            </Text>
+            <View style={styles.sectionText}>
+              <Text style={styles.sectionTitle}>
+                Weekly activity
+              </Text>
+              <Text style={styles.sectionSubtitle}>
+                Completed habits per day
+              </Text>
+            </View>
           </View>
 
-          {dailyCounts.map((day) => {
-            const barWidth = (day.count / maxCount) * 100;
+          <View style={styles.chartContainer}>
+            {dailyCounts.map((day) => {
+              const height =
+                day.count === 0
+                  ? 4
+                  : Math.max(10, (day.count / maxCount) * 105);
 
-            return (
-              <View
-                key={day.key}
-                className="mb-5 flex-row items-center"
-              >
-                <View className="w-[58px]">
+              return (
+                <View key={day.key} style={styles.chartColumn}>
                   <Text
-                    className={`text-xs font-semibold ${
-                      day.isToday
-                        ? "text-[#5965C9]"
-                        : "text-[#858BA1]"
-                    }`}
-                  >
-                    {day.isToday ? "Today" : day.label}
-                  </Text>
-
-                  <Text className="mt-1 text-xs text-[#A0A5B6]">
-                    {day.date}
-                  </Text>
-                </View>
-
-                <View className="mx-3 h-3 flex-1 overflow-hidden rounded-full bg-[#F0F1F7]">
-                  {day.count > 0 && (
-                    <View
-                      className="h-full rounded-full bg-[#5965C9]"
-                      style={{ width: `${barWidth}%` }}
-                    />
-                  )}
-                </View>
-
-                <View className="w-6 items-end">
-                  <Text
-                    className={`text-xs font-bold ${
+                    style={[
+                      styles.chartCount,
                       day.count > 0
-                        ? "text-[#5965C9]"
-                        : "text-[#A0A5B6]"
-                    }`}
+                        ? styles.chartCountActive
+                        : styles.chartCountInactive,
+                    ]}
                   >
                     {day.count}
                   </Text>
+
+                  <View
+                    style={[
+                      styles.chartBar,
+                      {
+                        height,
+                        backgroundColor: day.isToday
+                          ? colors.primary
+                          : day.count > 0
+                            ? colors.lavender
+                            : colors.primaryLight,
+                      },
+                    ]}
+                  />
                 </View>
-              </View>
-            );
-          })}
-
-          <View className="mt-1 flex-row items-center rounded-2xl bg-[#F5F6FF] p-3">
-            <Text className="mr-2 text-base">💡</Text>
-            <Text className="flex-1 text-xs leading-5 text-[#747B9A]">
-              Every completed habit is a step toward your goals.
-            </Text>
+              );
+            })}
           </View>
-        </View>
 
-        {/* Habit history */}
-        <View className="rounded-[26px] border border-[#EAECF4] bg-white p-5">
-          <Text className="text-xl font-extrabold text-[#292D40]">
-            Habit history
-          </Text>
+          <View style={styles.chartLabels}>
+            {dailyCounts.map((day) => (
+              <View key={day.key} style={styles.chartLabelColumn}>
+                <Text
+                  style={[
+                    styles.chartDay,
+                    day.isToday && styles.chartDayToday,
+                  ]}
+                >
+                  {day.label}
+                </Text>
 
-          <Text className="mb-4 mt-1.5 text-sm text-[#858BA1]">
-            Your consistency, one habit at a time.
-          </Text>
+                <Text
+                  style={[
+                    styles.chartDate,
+                    day.isToday && styles.chartDateToday,
+                  ]}
+                >
+                  {day.date}
+                </Text>
+              </View>
+            ))}
+          </View>
 
-          {habits.length === 0 ? (
-            <View className="items-center rounded-2xl bg-[#F7F8FC] px-4 py-7">
-              <Text className="text-3xl">🌱</Text>
+          <View style={styles.tipBox}>
+            <View style={styles.tipIcon}>
+              <Trophy size={19} color={colors.primary} />
+            </View>
 
-              <Text className="mt-3 text-sm font-bold text-[#292D40]">
-                Your journey starts here
+            <View style={styles.tipTextContainer}>
+              <Text style={styles.tipTitle}>
+                Small wins add up
               </Text>
 
-              <Text className="mt-2 text-center text-xs leading-5 text-[#858BA1]">
-                Add your first habit to begin tracking your progress.
+              <Text style={styles.tipDescription}>
+                You've logged {weeklyCompletions} habit completions
+                in the last 7 days.
+              </Text>
+            </View>
+          </View>
+        </AppCard>
+
+        {/* Habit history */}
+        <AppCard>
+          <View style={styles.sectionHeading}>
+            <View
+              style={[
+                styles.sectionIcon,
+                styles.sectionIconPink,
+              ]}
+            >
+              <Flame size={21} color={colors.pink} />
+            </View>
+
+            <View style={styles.sectionText}>
+              <Text style={styles.sectionTitle}>
+                Habit history
+              </Text>
+              <Text style={styles.sectionSubtitle}>
+                Your consistency over time
+              </Text>
+            </View>
+          </View>
+
+          {habits.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>🌱</Text>
+
+              <Text style={styles.emptyTitle}>
+                Your story starts here
+              </Text>
+
+              <Text style={styles.emptyDescription}>
+                Add a habit to start tracking your progress and
+                streaks.
               </Text>
             </View>
           ) : (
-            habits.map((habit, index) => {
-              const currentStreak = (() => {
-                let streak = 0;
-                const date = new Date();
-
-                if (!habit.completedDates.includes(todayKey)) {
-                  date.setDate(date.getDate() - 1);
-                }
-
-                while (habit.completedDates.includes(getDateKey(date))) {
-                  streak += 1;
-                  date.setDate(date.getDate() - 1);
-                }
-
-                return streak;
-              })();
-
-              return (
-                <View
-                  key={habit.id}
-                  className={`flex-row items-center py-4 ${
-                    index < habits.length - 1
-                      ? "border-b border-[#F0F1F7]"
-                      : ""
-                  }`}
-                >
-                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-[#F0F1FF]">
-                    <Text className="text-[25px]">{habit.emoji}</Text>
-                  </View>
-
-                  <View className="ml-3 flex-1">
-                    <Text
-                      numberOfLines={1}
-                      className="text-sm font-bold text-[#292D40]"
-                    >
-                      {habit.title}
-                    </Text>
-
-                    <Text className="mt-1.5 text-xs text-[#858BA1]">
-                      {habit.completedDates.length} recorded days
-                    </Text>
-                  </View>
-
-                  <View className="ml-2 items-center rounded-2xl bg-[#FFF4E7] px-3 py-2">
-                    <Text className="text-xs font-bold text-[#C66B1B]">
-                      🔥 {currentStreak}
-                    </Text>
-
-                    <Text className="mt-1 text-[9px] font-medium text-[#C66B1B]">
-                      DAY STREAK
-                    </Text>
-                  </View>
+            habits.map((habit, index) => (
+              <View
+                key={habit.id}
+                style={[
+                  styles.historyRow,
+                  index === habits.length - 1 &&
+                    styles.historyRowLast,
+                ]}
+              >
+                <View style={styles.habitEmoji}>
+                  <Text style={styles.habitEmojiText}>
+                    {habit.emoji}
+                  </Text>
                 </View>
-              );
-            })
-          )}
-        </View>
 
-        <Text className="mt-7 text-center text-xs text-[#A0A5B6]">
+                <View style={styles.habitInfo}>
+                  <Text
+                    numberOfLines={1}
+                    style={styles.habitTitle}
+                  >
+                    {habit.title}
+                  </Text>
+
+                  <Text style={styles.habitRecorded}>
+                    {habit.completedDates.length} recorded days
+                  </Text>
+                </View>
+
+                <View style={styles.streakBadge}>
+                  <View style={styles.streakRow}>
+                    <Flame
+                      size={14}
+                      color={colors.orange}
+                      fill={colors.orange}
+                    />
+
+                    <Text style={styles.streakNumber}>
+                      {currentStreak(habit.completedDates)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.streakLabel}>
+                    DAY STREAK
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+        </AppCard>
+
+        <Text style={styles.footer}>
           Keep growing, one day at a time ✨
         </Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

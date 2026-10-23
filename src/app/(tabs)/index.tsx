@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Svg, { Circle } from "react-native-svg";
 import {
-  ArrowRight,
+  // ArrowRight,
   CalendarDays,
   Check,
   ChevronRight,
@@ -406,7 +406,7 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
 
-        {/* Progress shortcut */}
+        {/* Progress shortcut
         <Pressable
           onPress={() => router.push("/progress")}
           accessibilityRole="button"
@@ -427,7 +427,7 @@ export default function HomeScreen() {
           </View>
 
           <ArrowRight size={19} color={C.purple} />
-        </Pressable>
+        </Pressable> */}
 
         {/* Footer */}
         <View className="mt-7 items-center">
