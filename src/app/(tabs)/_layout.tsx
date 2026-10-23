@@ -1,23 +1,42 @@
+
 import { Tabs } from "expo-router";
-import { ColorValue, Text } from "react-native";
+import {
+  House,
+  ChartNoAxesCombined,
+  Info,
+} from "lucide-react-native";
+
+const COLORS = {
+  primary: "#5965C9",
+  inactive: "#9296A6",
+  background: "#FFFFFF",
+  border: "#EEF0F6",
+};
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#5965C9",
-        tabBarInactiveTintColor: "#9296A6",
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.inactive,
         tabBarStyle: {
-          backgroundColor: "#FFFFFF",
-          borderTopColor: "#EEF0F6",
-          height: 62,
-          paddingTop: 7,
-          paddingBottom: 7,
+          backgroundColor: COLORS.background,
+          borderTopColor: COLORS.border,
+          borderTopWidth: 1,
+          height: 68,
+          paddingTop: 8,
+          paddingBottom: 8,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: "600",
+          marginTop: 3,
+        },
+        tabBarItemStyle: {
+          borderRadius: 16,
         },
       }}
     >
@@ -26,8 +45,12 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarLabel: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <TextIcon emoji="🏠" color={color} size={size} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <House
+              color={color}
+              size={size}
+              strokeWidth={focused ? 2.5 : 1.8}
+            />
           ),
         }}
       />
@@ -37,8 +60,12 @@ export default function TabLayout() {
         options={{
           title: "Progress",
           tabBarLabel: "Progress",
-          tabBarIcon: ({ color, size }) => (
-            <TextIcon emoji="📈" color={color} size={size} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <ChartNoAxesCombined
+              color={color}
+              size={size}
+              strokeWidth={focused ? 2.5 : 1.8}
+            />
           ),
         }}
       />
@@ -48,32 +75,15 @@ export default function TabLayout() {
         options={{
           title: "About",
           tabBarLabel: "About",
-          tabBarIcon: ({ color, size }) => (
-            <TextIcon emoji="ℹ️" color={color} size={size} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Info
+              color={color}
+              size={size}
+              strokeWidth={focused ? 2.5 : 1.8}
+            />
           ),
         }}
       />
     </Tabs>
-  );
-}
-
-function TextIcon({
-  emoji,
-  color,
-  size,
-}: {
-  emoji: string;
-  color: ColorValue;
-  size: number;
-}) {
-  return (
-    <Text
-      style={{
-        fontSize: size,
-        color,
-      }}
-    >
-      {emoji}
-    </Text>
   );
 }
