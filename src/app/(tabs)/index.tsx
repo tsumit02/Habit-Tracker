@@ -98,8 +98,14 @@ export default function HomeScreen() {
 
         {/* Habit list */}
         {habits.map((habit) => (
-          <View
+          <Pressable
             key={habit.id}
+            onPress={() =>
+              router.push({
+                pathname: "/add-habit",
+                params: { id: habit.id },
+              })
+            }
             style={[
               styles.habitCard,
               habit.completed && styles.completedCard,
@@ -142,7 +148,7 @@ export default function HomeScreen() {
                 {habit.completed ? "✓" : "+"}
               </Text>
             </Pressable>
-          </View>
+          </Pressable>
         ))}
 
         {/* Navigate to Add Habit screen */}
