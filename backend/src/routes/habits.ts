@@ -8,15 +8,62 @@ import {
 
 const router = Router();
 
-// All habit endpoints require a valid JWT.
 router.use(authenticateToken);
 
-// GET /api/habits — list the current user's habits
+const VALID_FREQUENCIES = [
+  "daily",
+  "weekdays",
+  "custom",
+  "weekly",
+] as const;
+
+type Frequency = (typeof VALID_FREQUENCIES)[number];
+
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+const WEEKDAYS = [1, 2, 3, 4, 5];
+
+function isValidHabitId(value: unknown): value is string {
+  return typeof value === "string" && /^[1-9]\d*$/.test(value);
+}
+
+function isValidFrequency(value: unknown): value is Frequency {
+  return (
+    typeof value === "string" &&
+    VALID_FREQUENCIES.includes(value as Frequency)
+  );
+}
+
+function isValidScheduledDays(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(
+      (day) =>
+        Number.isInteger(day) &&
+        day >= 0 &&
+        day <= 6
+    ) &&
+    new Set(value).size === value.length
+  );
+}
+
+function defaultScheduledDays(frequency: Frequency): number[] {
+  if (frequency === "weekdays") return WEEKDAYS;
+  if (frequency === "custom") return ALL_DAYS;
+  if (frequency === "weekly") return ALL_DAYS;
+  return ALL_DAYS;
+}
+
+const HABIT_COLUMNS = `
+  id, title, description, subtitle, emoji, frequency,
+  scheduled_days, is_active, created_at, updated_at
+`;
+
+// GET /api/habits
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
-      `SELECT id, title, description, frequency, is_active,
-              created_at, updated_at
+      `SELECT ${HABIT_COLUMNS}
        FROM habits
        WHERE user_id = $1
        ORDER BY created_at DESC`,
@@ -30,11 +77,21 @@ router.get("/", async (req: AuthRequest, res: Response) => {
   }
 });
 
-// POST /api/habits — create a habit
+// POST /api/habits
 router.post("/", async (req: AuthRequest, res: Response) => {
   try {
-    const { title, description = null, frequency = "daily" } =
-      req.body ?? {};
+    const body = req.body ?? {};
+    const {
+      title,
+      description = null,
+      subtitle = "",
+      emoji = "🎯",
+      frequency = "daily",
+    } = body;
+
+    const scheduledDays =
+      body.scheduled_days ??
+      defaultScheduledDays(frequency as Frequency);
 
     if (
       typeof title !== "string" ||
@@ -57,26 +114,56 @@ router.post("/", async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (description && description.length > 10000) {
+    if (typeof subtitle !== "string" || subtitle.length > 255) {
       res.status(400).json({
-        message: "Description is too long.",
+        message: "Subtitle must be a string of at most 255 characters.",
       });
       return;
     }
 
-    if (!["daily", "weekly"].includes(frequency)) {
+    if (typeof emoji !== "string" || emoji.length > 20) {
       res.status(400).json({
-        message: "Frequency must be daily or weekly.",
+        message: "Emoji must be a string of at most 20 characters.",
       });
+      return;
+    }
+
+    if (!isValidFrequency(frequency)) {
+      res.status(400).json({
+        message: "Frequency must be daily, weekdays, custom, or weekly.",
+      });
+      return;
+    }
+
+    if (!isValidScheduledDays(scheduledDays)) {
+      res.status(400).json({
+        message: "scheduled_days must contain unique day numbers from 0 to 6.",
+      });
+      return;
+    }
+
+    if (
+      typeof description === "string" &&
+      description.length > 10000
+    ) {
+      res.status(400).json({ message: "Description is too long." });
       return;
     }
 
     const result = await pool.query(
-      `INSERT INTO habits (user_id, title, description, frequency)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, title, description, frequency, is_active,
-                 created_at, updated_at`,
-      [req.userId, title.trim(), description, frequency]
+      `INSERT INTO habits
+        (user_id, title, description, subtitle, emoji, frequency, scheduled_days)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING ${HABIT_COLUMNS}`,
+      [
+        req.userId,
+        title.trim(),
+        description,
+        subtitle.trim(),
+        emoji,
+        frequency,
+        scheduledDays,
+      ]
     );
 
     res.status(201).json({
@@ -89,24 +176,24 @@ router.post("/", async (req: AuthRequest, res: Response) => {
   }
 });
 
-// PATCH /api/habits/:id — update only the current user's habit
+// PATCH /api/habits/:id
 router.patch("/:id", async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id;
 
-    if (typeof id !== "string" || !/^[1-9]\d*$/.test(id)) {
-    res.status(400).json({ message: "Invalid habit ID." });
-    return;
-    }
-    const body = req.body ?? {};
-
-    if (!/^[1-9]\d*$/.test(id)) {
+    if (!isValidHabitId(id)) {
       res.status(400).json({ message: "Invalid habit ID." });
       return;
     }
 
+    const body = req.body ?? {};
     const updates: string[] = [];
     const values: unknown[] = [];
+
+    function addUpdate(column: string, value: unknown) {
+      values.push(value);
+      updates.push(`${column} = $${values.length}`);
+    }
 
     if (Object.hasOwn(body, "title")) {
       if (
@@ -117,9 +204,7 @@ router.patch("/:id", async (req: AuthRequest, res: Response) => {
         res.status(400).json({ message: "Invalid habit title." });
         return;
       }
-
-      values.push(body.title.trim());
-      updates.push(`title = $${values.length}`);
+      addUpdate("title", body.title.trim());
     }
 
     if (Object.hasOwn(body, "description")) {
@@ -140,21 +225,47 @@ router.patch("/:id", async (req: AuthRequest, res: Response) => {
         res.status(400).json({ message: "Description is too long." });
         return;
       }
+      addUpdate("description", body.description);
+    }
 
-      values.push(body.description);
-      updates.push(`description = $${values.length}`);
+    if (Object.hasOwn(body, "subtitle")) {
+      if (
+        typeof body.subtitle !== "string" ||
+        body.subtitle.length > 255
+      ) {
+        res.status(400).json({ message: "Invalid subtitle." });
+        return;
+      }
+      addUpdate("subtitle", body.subtitle.trim());
+    }
+
+    if (Object.hasOwn(body, "emoji")) {
+      if (
+        typeof body.emoji !== "string" ||
+        body.emoji.length > 20
+      ) {
+        res.status(400).json({ message: "Invalid emoji." });
+        return;
+      }
+      addUpdate("emoji", body.emoji);
     }
 
     if (Object.hasOwn(body, "frequency")) {
-      if (!["daily", "weekly"].includes(body.frequency)) {
+      if (!isValidFrequency(body.frequency)) {
+        res.status(400).json({ message: "Invalid frequency." });
+        return;
+      }
+      addUpdate("frequency", body.frequency);
+    }
+
+    if (Object.hasOwn(body, "scheduled_days")) {
+      if (!isValidScheduledDays(body.scheduled_days)) {
         res.status(400).json({
-          message: "Frequency must be daily or weekly.",
+          message: "scheduled_days must contain unique day numbers from 0 to 6.",
         });
         return;
       }
-
-      values.push(body.frequency);
-      updates.push(`frequency = $${values.length}`);
+      addUpdate("scheduled_days", body.scheduled_days);
     }
 
     if (Object.hasOwn(body, "is_active")) {
@@ -164,9 +275,7 @@ router.patch("/:id", async (req: AuthRequest, res: Response) => {
         });
         return;
       }
-
-      values.push(body.is_active);
-      updates.push(`is_active = $${values.length}`);
+      addUpdate("is_active", body.is_active);
     }
 
     if (updates.length === 0) {
@@ -186,8 +295,7 @@ router.patch("/:id", async (req: AuthRequest, res: Response) => {
       `UPDATE habits
        SET ${updates.join(", ")}, updated_at = NOW()
        WHERE id = $${idPosition} AND user_id = $${userPosition}
-       RETURNING id, title, description, frequency, is_active,
-                 created_at, updated_at`,
+       RETURNING ${HABIT_COLUMNS}`,
       values
     );
 
@@ -206,17 +314,12 @@ router.patch("/:id", async (req: AuthRequest, res: Response) => {
   }
 });
 
-// DELETE /api/habits/:id — delete only the current user's habit
+// DELETE /api/habits/:id
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id;
 
-    if (typeof id !== "string" || !/^[1-9]\d*$/.test(id)) {
-    res.status(400).json({ message: "Invalid habit ID." });
-    return;
-    }
-
-    if (!/^[1-9]\d*$/.test(id)) {
+    if (!isValidHabitId(id)) {
       res.status(400).json({ message: "Invalid habit ID." });
       return;
     }
