@@ -1,15 +1,18 @@
-import { ScrollView, Text, View } from "react-native";
+import { useState } from "react";
+import { Alert, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   CheckCircle2,
   Flame,
   Heart,
+  LogOut,
   Repeat2,
   Sparkles,
   Target,
 } from "lucide-react-native";
 
-import { AppCard } from "../../components/ui";
+import { AppCard, AppButton } from "../../components/ui";
+import { useAuth } from "../../context/AuthContext";
 import { colors, spacing } from "../../theme";
 import styles from "../../styles/about.styles";
 
@@ -49,6 +52,33 @@ const features = [
 ];
 
 export default function AboutScreen() {
+  const { logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Log out",
+      "Are you sure you want to log out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Log out",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsLoggingOut(true);
+              await logout();
+            } catch (error) {
+              console.error("Logout failed:", error);
+              Alert.alert("Error", "Unable to log out. Please try again.");
+            } finally {
+              setIsLoggingOut(false);
+            }
+          },
+        },
+      ]
+    );
+  };
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <ScrollView
@@ -126,7 +156,15 @@ export default function AboutScreen() {
             yourself, one small step at a time.
           </Text>
         </View>
-
+        <View style={{ marginTop: spacing.md, marginBottom: spacing.xl }}>
+  <AppButton
+    title={isLoggingOut ? "Logging out..." : "Log out"}
+    onPress={handleLogout}
+    disabled={isLoggingOut}
+    variant="danger"
+    icon={<LogOut size={18} color={colors.danger} />}
+  />
+</View>
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             Made for your everyday growth

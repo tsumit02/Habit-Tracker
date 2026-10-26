@@ -60,25 +60,33 @@ router.post(
         return;
       }
 
-      const result = await pool.query(
-        `INSERT INTO habit_completions (habit_id, completed_on)
-         VALUES ($1, $2)
-         ON CONFLICT (habit_id, completed_on) DO NOTHING
-         RETURNING id, habit_id, completed_on, created_at`,
+    const result = await pool.query(
+      `INSERT INTO habit_completions (habit_id, completed_on)
+      VALUES ($1, $2)
+      ON CONFLICT (habit_id, completed_on) DO NOTHING
+      RETURNING id, habit_id, completed_on, created_at`,
+      [id, completed_on]
+    );
+
+    if (result.rowCount === 0) {
+      const existing = await pool.query(
+        `SELECT id, habit_id, completed_on, created_at
+        FROM habit_completions
+        WHERE habit_id = $1 AND completed_on = $2`,
         [id, completed_on]
       );
 
-      if (result.rowCount === 0) {
-        res.status(409).json({
-          message: "This habit is already completed for that date.",
-        });
-        return;
-      }
-
-      res.status(201).json({
-        message: "Habit marked as complete.",
-        completion: result.rows[0],
+      res.status(200).json({
+        message: "Habit was already completed.",
+        completion: existing.rows[0],
       });
+      return;
+    }
+
+    res.status(201).json({
+      message: "Habit marked as complete.",
+      completion: result.rows[0],
+    });
     } catch (error) {
       console.error("Failed to record completion:", error);
       res.status(500).json({
@@ -94,6 +102,10 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     try {
       const id = req.params.id;
+      console.log("[Completions GET]", {
+        habitId: id,
+        userId: req.userId,
+      });
 
       if (!validHabitId(id)) {
         res.status(400).json({ message: "Invalid habit ID." });
@@ -101,7 +113,7 @@ router.get(
       }
 
       const result = await pool.query(
-        `SELECT hc.id, hc.habit_id, hc.completed_on, hc.created_at
+        `SELECT hc.id, hc.habit_id, hc.completed_on::text AS completed_on, hc.created_at
          FROM habit_completions hc
          INNER JOIN habits h ON h.id = hc.habit_id
          WHERE h.id = $1 AND h.user_id = $2
@@ -120,6 +132,7 @@ router.get(
       }
 
       res.json({ completions: result.rows });
+      console.log("[Completions GET] Result:", result.rows);
     } catch (error) {
       console.error("Failed to fetch completions:", error);
       res.status(500).json({

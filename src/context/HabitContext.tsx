@@ -1,3 +1,4 @@
+
 import React, {
   createContext,
   useContext,
@@ -6,6 +7,7 @@ import React, {
   type ReactNode,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { apiRequest } from "../services/api";
 
 export type HabitFrequency = "daily" | "weekdays" | "custom";
 
@@ -22,13 +24,15 @@ export type Habit = {
 
 type HabitContextType = {
   habits: Habit[];
+  isLoading: boolean;
+  refreshHabits: () => Promise<void>;
   addHabit: (
     title: string,
     subtitle: string,
     emoji: string,
     frequency: HabitFrequency,
     scheduledDays: number[]
-  ) => void;
+  ) => Promise<void>;
   updateHabit: (
     id: string,
     title: string,
@@ -36,9 +40,9 @@ type HabitContextType = {
     emoji: string,
     frequency: HabitFrequency,
     scheduledDays: number[]
-  ) => void;
-  deleteHabit: (id: string) => void;
-  toggleHabit: (id: string) => void;
+  ) => Promise<void>;
+  deleteHabit: (id: string) => Promise<void>;
+  toggleHabit: (id: string) => Promise<void>;
 };
 
 const STORAGE_KEY = "@habit_tracker/habits";
@@ -46,13 +50,63 @@ const STORAGE_KEY = "@habit_tracker/habits";
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
-// Use local calendar dates, not UTC dates.
 function getDateKey(date = new Date()): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
-
   return `${year}-${month}-${day}`;
+}
+function normalizeCompletionDate(value: string): string {
+  // PostgreSQL DATE values may arrive as UTC midnight timestamps.
+  // Convert timestamps to the device's local calendar date.
+  if (value.includes("T")) {
+    return getDateKey(new Date(value));
+  }
+
+  return value.slice(0, 10);
+}
+
+type ApiHabit = {
+  id: string | number;
+  title: string;
+  subtitle?: string | null;
+  description?: string | null;
+  emoji?: string | null;
+  frequency?: string | null;
+  scheduled_days?: number[] | null;
+};
+
+type ApiCompletion = {
+  completed_on: string;
+};
+
+function mapHabit(
+  item: ApiHabit,
+  completedDates: string[]
+): Habit {
+  const frequency: HabitFrequency =
+    item.frequency === "weekdays" || item.frequency === "custom"
+      ? item.frequency
+      : "daily";
+
+  const scheduledDays = Array.isArray(item.scheduled_days)
+    ? item.scheduled_days
+    : frequency === "weekdays"
+      ? WEEKDAYS
+      : ALL_DAYS;
+
+  const dates = [...new Set(completedDates)];
+
+  return {
+    id: String(item.id),
+    title: item.title,
+    subtitle: item.subtitle || item.description || "Daily goal",
+    emoji: item.emoji || "🎯",
+    completedDates: dates,
+    completed: dates.includes(getDateKey()),
+    frequency,
+    scheduledDays,
+  };
 }
 
 const HabitContext = createContext<HabitContextType | undefined>(
@@ -60,180 +114,232 @@ const HabitContext = createContext<HabitContextType | undefined>(
 );
 
 export function HabitProvider({ children }: { children: ReactNode }) {
-  // New installations start with an empty habit list.
   const [habits, setHabits] = useState<Habit[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load existing habits and migrate older saved records.
+  const refreshHabits = async (): Promise<void> => {
+    setIsLoading(true);
+
+    try {
+      const response = await apiRequest<{ habits: ApiHabit[] }>(
+        "/api/habits"
+      );
+
+      const loadedHabits = await Promise.all(
+        response.habits.map(async (item) => {
+          try {
+            const completionResponse = await apiRequest<{
+              completions: ApiCompletion[];
+            }>(`/api/habits/${item.id}/completions`);
+
+      const dates = completionResponse.completions
+        .map((completion) =>
+          normalizeCompletionDate(completion.completed_on)
+        )
+        .filter(Boolean);
+
+            return mapHabit(item, dates);
+          } catch (error) {
+            console.error(
+              `[Habits] Could not load completions for habit ${item.id}:`,
+              error
+            );
+
+            return mapHabit(item, []);
+          }
+        })
+      );
+
+      setHabits(loadedHabits);
+
+      await AsyncStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(loadedHabits)
+      );
+
+      console.log(`[Habits] Loaded ${loadedHabits.length} habits from API`);
+    } catch (error) {
+      console.error("[Habits] Failed to fetch habits:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     let active = true;
 
-    async function loadHabits() {
+    async function initialLoad() {
       try {
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
+        const response = await apiRequest<{ habits: ApiHabit[] }>(
+          "/api/habits"
+        );
 
-        if (saved !== null) {
-          const parsed: unknown = JSON.parse(saved);
+        const loadedHabits = await Promise.all(
+          response.habits.map(async (item) => {
+            try {
+              const result = await apiRequest<{
+                completions: ApiCompletion[];
+              }>(`/api/habits/${item.id}/completions`);
 
-          if (Array.isArray(parsed)) {
-            const migrated: Habit[] = parsed
-              .filter(
-                (item) =>
-                  item !== null &&
-                  typeof item === "object" &&
-                  typeof item.id === "string" &&
-                  typeof item.title === "string" &&
-                  typeof item.subtitle === "string" &&
-                  typeof item.emoji === "string" &&
-                  typeof item.completed === "boolean"
-              )
-              .map((item) => {
-                const old = item as Partial<Habit>;
+        const dates = result.completions
+          .map((completion) =>
+            normalizeCompletionDate(completion.completed_on)
+          )
+          .filter(Boolean);
 
-                const completedDates = Array.isArray(old.completedDates)
-                  ? [
-                      ...new Set(
-                        old.completedDates.filter(
-                          (date): date is string =>
-                            typeof date === "string" &&
-                            /^\d{4}-\d{2}-\d{2}$/.test(date)
-                        )
-                      ),
-                    ]
-                  : [];
-
-                const frequency: HabitFrequency =
-                  old.frequency === "weekdays" ||
-                  old.frequency === "custom"
-                    ? old.frequency
-                    : "daily";
-
-                const scheduledDays = Array.isArray(old.scheduledDays)
-                  ? [
-                      ...new Set(
-                        old.scheduledDays.filter(
-                          (day): day is number =>
-                            Number.isInteger(day) &&
-                            day >= 0 &&
-                            day <= 6
-                        )
-                      ),
-                    ]
-                  : frequency === "weekdays"
-                    ? WEEKDAYS
-                    : ALL_DAYS;
-
-                return {
-                  id: old.id!,
-                  title: old.title!,
-                  subtitle: old.subtitle!,
-                  emoji: old.emoji!,
-                  completedDates,
-                  completed: completedDates.includes(getDateKey()),
-                  frequency,
-                  scheduledDays,
-                };
-              });
-
-            if (active) {
-              setHabits(migrated);
+              return mapHabit(item, dates);
+            } catch (error) {
+              console.error(
+                `[Habits] Completion fetch failed for ${item.id}:`,
+                error
+              );
+              return mapHabit(item, []);
             }
-          }
+          })
+        );
+
+        if (active) {
+          setHabits(loadedHabits);
+          await AsyncStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(loadedHabits)
+          );
         }
       } catch (error) {
-        console.error("Failed to load habits:", error);
-      } finally {
-        if (active) {
-          setIsLoaded(true);
+        console.error("[Habits] Initial API load failed:", error);
+
+        // Keep any existing local data visible if the API is unavailable.
+        try {
+          const saved = await AsyncStorage.getItem(STORAGE_KEY);
+
+          if (active && saved) {
+            const parsed: unknown = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              setHabits(parsed as Habit[]);
+            }
+          }
+        } catch (storageError) {
+          console.error("[Habits] Local fallback failed:", storageError);
         }
+      } finally {
+        if (active) setIsLoading(false);
       }
     }
 
-    loadHabits();
+    void initialLoad();
 
     return () => {
       active = false;
     };
   }, []);
 
-  // Save only after loading has finished.
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    AsyncStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(habits)
-    ).catch((error) => {
-      console.error("Failed to save habits:", error);
-    });
-  }, [habits, isLoaded]);
-
-  const addHabit = (
+  const addHabit = async (
     title: string,
     subtitle: string,
     emoji: string,
     frequency: HabitFrequency,
     scheduledDays: number[]
-  ) => {
-    const newHabit: Habit = {
-      id: `${Date.now()}-${Math.random()}`,
-      title: title.trim(),
-      subtitle: subtitle.trim() || "Daily goal",
-      emoji,
-      completed: false,
-      completedDates: [],
-      frequency,
-      scheduledDays: [...new Set(scheduledDays)].sort(),
-    };
+  ): Promise<void> => {
+    const response = await apiRequest<{ habit: ApiHabit }>(
+      "/api/habits",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          title: title.trim(),
+          subtitle: subtitle.trim() || "Daily goal",
+          description: subtitle.trim() || null,
+          emoji,
+          frequency,
+          scheduled_days: [...new Set(scheduledDays)].sort(),
+        }),
+      }
+    );
 
-    setHabits((current) => [...current, newHabit]);
+    setHabits((current) => [
+      mapHabit(response.habit, []),
+      ...current,
+    ]);
   };
-  const updateHabit = (
+
+  const updateHabit = async (
     id: string,
     title: string,
     subtitle: string,
     emoji: string,
     frequency: HabitFrequency,
     scheduledDays: number[]
-  ) => {
+  ): Promise<void> => {
+    const response = await apiRequest<{ habit: ApiHabit }>(
+      `/api/habits/${id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: title.trim(),
+          subtitle: subtitle.trim() || "Daily goal",
+          description: subtitle.trim() || null,
+          emoji,
+          frequency,
+          scheduled_days: [...new Set(scheduledDays)].sort(),
+        }),
+      }
+    );
+
     setHabits((current) =>
       current.map((habit) =>
         habit.id === id
-          ? {
-              ...habit,
-              title: title.trim(),
-              subtitle: subtitle.trim() || "Daily goal",
-              emoji,
-              frequency,
-              scheduledDays: [...new Set(scheduledDays)].sort(),
-            }
+          ? mapHabit(
+              response.habit,
+              habit.completedDates
+            )
           : habit
       )
     );
   };
 
-  const deleteHabit = (id: string) => {
+  const deleteHabit = async (id: string): Promise<void> => {
+    await apiRequest<void>(`/api/habits/${id}`, {
+      method: "DELETE",
+    });
+
     setHabits((current) =>
       current.filter((habit) => habit.id !== id)
     );
   };
 
-  const toggleHabit = (id: string) => {
+  const toggleHabit = async (id: string): Promise<void> => {
     const today = getDateKey();
+    const habit = habits.find((item) => item.id === id);
+
+    if (!habit) return;
+
+    const alreadyCompleted = habit.completedDates.includes(today);
+
+    if (alreadyCompleted) {
+      await apiRequest<void>(
+        `/api/habits/${id}/completions/${today}`,
+        { method: "DELETE" }
+      );
+    } else {
+      await apiRequest(
+        `/api/habits/${id}/completions`,
+        {
+          method: "POST",
+          body: JSON.stringify({ completed_on: today }),
+        }
+      );
+    }
 
     setHabits((current) =>
-      current.map((habit) => {
-        if (habit.id !== id) return habit;
-
-        const alreadyCompleted = habit.completedDates.includes(today);
+      current.map((item) => {
+        if (item.id !== id) return item;
 
         const completedDates = alreadyCompleted
-          ? habit.completedDates.filter((date) => date !== today)
-          : [...habit.completedDates, today];
+          ? item.completedDates.filter((date) => date !== today)
+          : [...item.completedDates, today];
 
         return {
-          ...habit,
+          ...item,
           completedDates,
           completed: !alreadyCompleted,
         };
@@ -245,6 +351,8 @@ export function HabitProvider({ children }: { children: ReactNode }) {
     <HabitContext.Provider
       value={{
         habits,
+        isLoading,
+        refreshHabits,
         addHabit,
         updateHabit,
         deleteHabit,
