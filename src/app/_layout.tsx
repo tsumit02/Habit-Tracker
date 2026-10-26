@@ -8,6 +8,7 @@ import {
 
 import { HabitProvider } from "../context/HabitContext";
 import { AuthProvider, useAuth } from "../context/AuthContext";
+import ConnectionGate from "../components/ConnectionGate";
 
 function RouteGuard() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -35,7 +36,9 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <HabitProvider>
-        <RouteGuard />
+        <ConnectionGate>
+          <RouteGuard />
+        </ConnectionGate>
       </HabitProvider>
     </AuthProvider>
   );

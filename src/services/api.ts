@@ -64,73 +64,86 @@ export async function apiRequest<T>(
     }
   }
 
-
-  let response: Response;
   const url = `${API_BASE_URL}${path}`;
   const method = requestOptions.method || "GET";
 
   console.log(`[API] Request: ${method} ${url}`);
+
+  let response: Response;
 
   try {
     response = await fetch(url, {
       ...requestOptions,
       headers,
     });
-
-    console.log(
-      `[API] Response: ${method} ${path} -> ${response.status}`
-    );
   } catch (error) {
-    console.error(`[API] Network error: ${method} ${url}`, error);
+    console.error(`[API] Network error: ${method} ${path}`, error);
 
     throw new ApiError(
-      `Cannot connect to the server at ${API_BASE_URL}. Check the API URL and network connection.`,
+      "Unable to connect to the server. Please check your connection and try again.",
       0
     );
   }
 
+  console.log(
+    `[API] Response: ${method} ${path} -> ${response.status}`
+  );
 
   if (response.status === 204) {
+    if (!response.ok) {
+      throw new ApiError("The request could not be completed.", response.status);
+    }
+
     return undefined as T;
   }
 
-  const data = await response.json().catch(
-    () => ({} as ApiErrorResponse)
-  );
+  let data: unknown = {};
 
+  try {
+    const responseText = await response.text();
+
+    if (responseText.trim()) {
+      data = JSON.parse(responseText);
+    }
+  } catch {
+    // The response may be empty or may not contain valid JSON.
+    data = {};
+  }
 
   if (!response.ok) {
-    const errorData = data as ApiErrorResponse;
+    const errorData =
+      data && typeof data === "object"
+        ? (data as ApiErrorResponse)
+        : {};
+
+    const message =
+      response.status >= 500
+        ? "Something went wrong on the server. Please try again later."
+        : errorData.message ||
+          (response.status === 401
+            ? "Your session may have expired. Please sign in again."
+            : response.status === 403
+              ? "You don't have permission to perform this action."
+              : response.status === 404
+                ? "The requested item could not be found."
+                : `Request failed (${response.status}).`);
 
     console.error(`[API] Request failed: ${method} ${path}`, {
       status: response.status,
-      message: errorData.message || "Unknown server error",
+      message: errorData.message || message,
     });
 
+    throw new ApiError(message, response.status);
+  }
+
+  if (data === null || typeof data !== "object") {
     throw new ApiError(
-      errorData.message || `Request failed (${response.status}).`,
+      "The server returned an invalid response. Please try again.",
       response.status
     );
   }
 
   console.log(`[API] Success: ${method} ${path}`);
-
-  if (!response.ok) {
-    const errorData = data as ApiErrorResponse;
-
-    console.error(`[API] Request failed: ${method} ${path}`, {
-      status: response.status,
-      message: errorData.message || "Unknown server error",
-    });
-
-    throw new ApiError(
-      errorData.message || `Request failed (${response.status}).`,
-      response.status
-    );
-  }
-
-  console.log(`[API] Success: ${method} ${path}`);
-
 
   return data as T;
 }

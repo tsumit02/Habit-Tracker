@@ -6,6 +6,7 @@ import {
   StatusBar,
   Text,
   View,
+  Alert
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -19,6 +20,24 @@ import {
   Sparkles,
 } from "lucide-react-native";
 import { useHabits } from "../../context/HabitContext";
+import { ApiError } from "../../services/api";
+
+const { habits, toggleHabit } = useHabits();
+
+const handleToggleHabit = async (habitId: string) => {
+  try {
+    await toggleHabit(habitId);
+  } catch (error) {
+    console.error("[Habits] Toggle failed:", error);
+
+    Alert.alert(
+      "Couldn't update habit",
+      error instanceof ApiError
+        ? error.message
+        : "We couldn't update your progress. Please try again."
+    );
+  }
+};
 
 const C = {
   bg: "#F5F5FF",
@@ -350,7 +369,7 @@ export default function HomeScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => toggleHabit(habit.id)}
+                onPress={() => handleToggleHabit(habit.id)}
                 accessibilityRole="checkbox"
                 accessibilityLabel={`Mark ${habit.title} as ${
                   habit.completed ? "incomplete" : "complete"

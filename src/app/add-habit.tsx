@@ -24,6 +24,7 @@ import { AppButton, AppCard, AppInput } from "../components/ui";
 import { colors, spacing } from "../theme";
 import { useHabits, HabitFrequency } from "../context/HabitContext";
 import styles from "../styles/add-habit.styles";
+import { ApiError } from "../services/api";
 
 const emojis = ["⭐", "💧", "📚", "🏃", "🧘", "💪", "🥗", "😴", "✍️", "🎯", "🧠", "🚶"];
 
@@ -66,6 +67,8 @@ export default function AddHabitScreen() {
   const insets = useSafeAreaInsets();
 
   const { habits, addHabit, updateHabit, deleteHabit } = useHabits();
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { id } = useLocalSearchParams<{ id?: string }>();
   const habitId = Array.isArray(id) ? id[0] : id;
@@ -110,34 +113,39 @@ export default function AddHabitScreen() {
     );
   };
 
-  const handleSave = () => {
-    const habitTitle = title.trim();
+const handleSave = async () => {
+  if (isSaving) return;
 
-    if (!habitTitle) {
-      Alert.alert(
-        "Habit name required",
-        "Please enter a name for your habit."
-      );
-      return;
-    }
+  const habitTitle = title.trim();
 
-    const scheduledDays =
-      frequency === "daily"
-        ? allDayValues
-        : frequency === "weekdays"
-          ? weekdayValues
-          : selectedDays;
+  if (!habitTitle) {
+    Alert.alert(
+      "Habit name required",
+      "Please enter a name for your habit."
+    );
+    return;
+  }
 
-    if (scheduledDays.length === 0) {
-      Alert.alert(
-        "Select at least one day",
-        "Choose one or more days for your custom habit."
-      );
-      return;
-    }
+  const scheduledDays =
+    frequency === "daily"
+      ? allDayValues
+      : frequency === "weekdays"
+        ? weekdayValues
+        : selectedDays;
 
+  if (scheduledDays.length === 0) {
+    Alert.alert(
+      "Select at least one day",
+      "Choose one or more days for your custom habit."
+    );
+    return;
+  }
+
+  setIsSaving(true);
+
+  try {
     if (isEditing && existingHabit) {
-      updateHabit(
+      await updateHabit(
         existingHabit.id,
         habitTitle,
         subtitle.trim(),
@@ -146,7 +154,7 @@ export default function AddHabitScreen() {
         scheduledDays
       );
     } else {
-      addHabit(
+      await addHabit(
         habitTitle,
         subtitle.trim(),
         emoji,
@@ -155,11 +163,27 @@ export default function AddHabitScreen() {
       );
     }
 
+    // Return only after the backend operation succeeds.
     router.back();
-  };
+  } catch (error) {
+    console.error("[AddHabit] Save failed:", error);
+
+    const message =
+      error instanceof ApiError
+        ? error.message
+        : "We couldn't save your habit. Please try again.";
+
+    Alert.alert(
+      isEditing ? "Couldn't update habit" : "Couldn't save habit",
+      message
+    );
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const handleDelete = () => {
-    if (!existingHabit) return;
+    if (!existingHabit || isDeleting) return;
 
     Alert.alert(
       "Delete habit?",
@@ -172,9 +196,24 @@ export default function AddHabitScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            deleteHabit(existingHabit.id);
-            router.back();
+          onPress: async () => {
+            setIsDeleting(true);
+
+            try {
+              await deleteHabit(existingHabit.id);
+              router.back();
+            } catch (error) {
+              console.error("[AddHabit] Delete failed:", error);
+
+              Alert.alert(
+                "Couldn't delete habit",
+                error instanceof ApiError
+                  ? error.message
+                  : "We couldn't delete this habit. Please try again."
+              );
+            } finally {
+              setIsDeleting(false);
+            }
           },
         },
       ]
@@ -412,9 +451,18 @@ export default function AddHabitScreen() {
           </AppCard>
 
           {/* Actions */}
-          <AppButton
-            title={isEditing ? "Update Habit" : "Save Habit"}
+         <AppButton
+            title={
+              isSaving
+                ? isEditing
+                  ? "Updating..."
+                  : "Saving..."
+                : isEditing
+                  ? "Update Habit"
+                  : "Save Habit"
+            }
             onPress={handleSave}
+            disabled={isSaving}
             icon={<Check size={19} color={colors.surface} />}
             style={styles.saveButton}
           />
@@ -430,11 +478,18 @@ export default function AddHabitScreen() {
           {isEditing && existingHabit && (
             <Pressable
               onPress={handleDelete}
+              disabled={isDeleting}
               style={styles.deleteButton}
               accessibilityRole="button"
             >
-              <Trash2 size={17} color={colors.danger} />
-              <Text style={styles.deleteText}>Delete Habit</Text>
+              {isDeleting ? (
+                <Text style={styles.deleteText}>Deleting...</Text>
+              ) : (
+                <>
+                  <Trash2 size={17} color={colors.danger} />
+                  <Text style={styles.deleteText}>Delete Habit</Text>
+                </>
+              )}
             </Pressable>
           )}
         </ScrollView>
