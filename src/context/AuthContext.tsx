@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 
@@ -12,6 +13,7 @@ import {
   getToken,
   removeToken,
   saveToken,
+  setUnauthorizedHandler,
 } from "../services/api";
 
 export type AuthUser = {
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const logoutInProgress = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -109,10 +112,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    await removeToken();
+    if (logoutInProgress.current) return;
+
+    logoutInProgress.current = true;
+
+    // Update the UI immediately.
     setUser(null);
     setIsAuthenticated(false);
+
+    try {
+      await removeToken();
+    } catch (error) {
+      console.error("Unable to remove authentication token:", error);
+    } finally {
+      logoutInProgress.current = false;
+    }
   }, []);
+    useEffect(() => {
+    setUnauthorizedHandler(() => logout());
+
+    return () => {
+      setUnauthorizedHandler(null);
+    };
+  }, [logout]);
 
   return (
     <AuthContext.Provider

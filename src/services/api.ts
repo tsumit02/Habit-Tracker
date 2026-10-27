@@ -6,6 +6,16 @@ const API_BASE_URL = (
 
 const TOKEN_KEY = "habit_tracker_auth_token";
 
+type UnauthorizedHandler = () => void | Promise<void>;
+
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(
+  handler: UnauthorizedHandler | null
+): void {
+  unauthorizedHandler = handler;
+}
+
 export type ApiErrorResponse = {
   message?: string;
 };
@@ -111,6 +121,15 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
+    // Only authenticated requests can invalidate the current session.
+    if (response.status === 401 && authenticated && unauthorizedHandler) {
+      try {
+        await unauthorizedHandler();
+      } catch (error) {
+        console.error("Automatic logout failed:", error);
+      }
+    }
+
     const errorData =
       data && typeof data === "object"
         ? (data as ApiErrorResponse)

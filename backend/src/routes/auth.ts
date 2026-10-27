@@ -1,8 +1,11 @@
-
 import { Router, Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { pool } from "../config/database.js";
+import {
+  authenticateToken,
+  type AuthRequest,
+} from "../middleware/auth.js";
 
 const router = Router();
 
@@ -15,6 +18,40 @@ function createToken(userId: string): string {
 
   return jwt.sign({ userId }, secret, { expiresIn: "1d" });
 }
+
+// GET /api/auth/me
+// Validate the token and return the authenticated user.
+router.get(
+  "/me",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, name, email
+         FROM users
+         WHERE id = $1`,
+        [req.userId]
+      );
+
+      if (result.rows.length === 0) {
+        res.status(401).json({
+          message: "User account no longer exists.",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        user: result.rows[0],
+      });
+    } catch (error) {
+      console.error("Session validation failed:", error);
+
+      res.status(500).json({
+        message: "Unable to validate session.",
+      });
+    }
+  }
+);
 
 // POST /api/auth/register
 router.post("/register", async (req: Request, res: Response) => {

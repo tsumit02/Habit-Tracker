@@ -22,22 +22,9 @@ import {
 import { useHabits } from "../../context/HabitContext";
 import { ApiError } from "../../services/api";
 
-const { habits, toggleHabit } = useHabits();
+// const { habits, toggleHabit } = useHabits();
 
-const handleToggleHabit = async (habitId: string) => {
-  try {
-    await toggleHabit(habitId);
-  } catch (error) {
-    console.error("[Habits] Toggle failed:", error);
 
-    Alert.alert(
-      "Couldn't update habit",
-      error instanceof ApiError
-        ? error.message
-        : "We couldn't update your progress. Please try again."
-    );
-  }
-};
 
 const C = {
   bg: "#F5F5FF",
@@ -100,6 +87,21 @@ function ProgressRing({
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { habits, toggleHabit } = useHabits();
+
+  const handleToggleHabit = async (habitId: string) => {
+  try {
+    await toggleHabit(habitId);
+  } catch (error) {
+    console.error("[Habits] Toggle failed:", error);
+
+    Alert.alert(
+      "Couldn't update habit",
+      error instanceof ApiError
+        ? error.message
+        : "We couldn't update your progress. Please try again."
+    );
+  }
+};
 
   const completedCount = habits.filter(
     (habit) => habit.completed
