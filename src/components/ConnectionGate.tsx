@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   AppState,
@@ -12,7 +12,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Network from "expo-network";
 import { Server, WifiOff, RefreshCw } from "lucide-react-native";
-
+import { useAuth } from "../context/AuthContext";
+import { ApiError } from "../services/api";
 import { colors, spacing } from "../theme";
 
 type ConnectionProblem = "network" | "server";
@@ -29,21 +30,30 @@ export default function ConnectionGate({
   children,
 }: ConnectionGateProps) {
   const insets = useSafeAreaInsets();
+  const { validateSession } = useAuth();
   const [problem, setProblem] = useState<ConnectionProblem | null>(null);
   const [checking, setChecking] = useState(true);
+  const checkInProgress = useRef(false);
+  const lastSessionValidationAt = useRef(0);
+  const wasConnected = useRef<boolean | null>(null);
+  const lastAppStateCheck = useRef(0);
 
   const checkConnection = useCallback(async () => {
-  setChecking(true);
-  setProblem(null);
+
+    if (checkInProgress.current) return;
+    checkInProgress.current = true;
+
+    setChecking(true);
 
     try {
       const network = await Network.getNetworkStateAsync();
 
-      if (network.isConnected === false) {
-        setProblem("network");
-        return;
-      }
+     wasConnected.current = network.isConnected ?? null;
 
+    if (network.isConnected === false) {
+      setProblem("network");
+      return;
+    }
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
 
@@ -57,21 +67,40 @@ export default function ConnectionGate({
           setProblem("server");
           return;
         }
-
-        setProblem(null);
       } catch {
-        // A connected device with an unreachable API has a server
-        // or network-path problem, not necessarily a total outage.
         setProblem("server");
+        return;
       } finally {
         clearTimeout(timeout);
       }
-    } catch {
-      setProblem("network");
+
+      // Validate the saved JWT only after the server is reachable.
+    const now = Date.now();
+
+    if (now - lastSessionValidationAt.current >= 5000) {
+      const sessionValid = await validateSession();
+
+      if (!sessionValid) {
+        setProblem("server");
+        return;
+      }
+
+      lastSessionValidationAt.current = Date.now();
+    }
+
+      setProblem(null);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        // The unauthorized handler has logged the user out.
+        setProblem(null);
+      } else {
+        setProblem("server");
+      }
     } finally {
       setChecking(false);
+      checkInProgress.current = false;
     }
-  }, []);
+  }, [validateSession]);
 
   useEffect(() => {
   // Check the connection on initial mount.
@@ -80,25 +109,37 @@ export default function ConnectionGate({
   // React immediately when Wi-Fi or mobile connectivity changes.
   const networkSubscription = Network.addNetworkStateListener(
     (state) => {
-      if (state.isConnected === false) {
-        // Show the error immediately without waiting for a timeout.
-        setProblem("network");
-        setChecking(false);
-      } else {
-        // Connectivity returned: verify that the backend is reachable.
-        void checkConnection();
-      }
-    }
+  const connected = state.isConnected === true;
+  const previouslyConnected = wasConnected.current;
+
+  wasConnected.current = state.isConnected ?? null;
+
+  if (!connected) {
+    setProblem("network");
+    setChecking(false);
+    return;
+  }
+
+  // Check only when connectivity transitions from offline to online.
+  if (previouslyConnected === false) {
+    void checkConnection();
+  }
+}
   );
 
   // Recheck when the user returns to the app.
   const appStateSubscription = AppState.addEventListener(
     "change",
     (nextState) => {
-      if (nextState === "active") {
-        void checkConnection();
-      }
-    }
+  if (nextState !== "active") return;
+
+  const now = Date.now();
+
+  if (now - lastAppStateCheck.current < 2000) return;
+
+  lastAppStateCheck.current = now;
+  void checkConnection();
+}
   );
 
   return () => {
@@ -107,82 +148,85 @@ export default function ConnectionGate({
   };
 }, [checkConnection]);
 
-  if (checking && problem === null) {
-    return (
-      <View style={[styles.screen, styles.centered]}>
-        <StatusBar barStyle="dark-content" />
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Checking connection...</Text>
-      </View>
-    );
-  }
-
-  if (problem === null) {
-    return <>{children}</>;
-  }
 
   const isNetworkError = problem === "network";
 
   return (
-    <View
-      style={[
-        styles.screen,
-        styles.centered,
-        {
-          paddingTop: Math.max(insets.top, spacing.lg),
-          paddingBottom: Math.max(insets.bottom, spacing.lg),
-        },
-      ]}
-    >
-      <StatusBar barStyle="dark-content" />
+    <View style={{ flex: 1 }}>
+      {/* Keep navigation mounted so the current screen is preserved. */}
+      {children}
 
-      <View style={styles.iconCircle}>
-        {isNetworkError ? (
-          <WifiOff size={42} color={colors.danger} />
-        ) : (
-          <Server size={42} color={colors.danger} />
-        )}
-      </View>
+      {checking && problem === null ? (
+        <View style={[styles.screen, styles.centered, styles.overlay]}>
+          <StatusBar barStyle="dark-content" />
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Checking connection...</Text>
+        </View>
+      ) : problem !== null ? (
+        <View
+          style={[
+            styles.screen,
+            styles.centered,
+            styles.overlay,
+            {
+              paddingTop: Math.max(insets.top, spacing.lg),
+              paddingBottom: Math.max(insets.bottom, spacing.lg),
+            },
+          ]}
+        >
+          <StatusBar barStyle="dark-content" />
 
-      <Text style={styles.title}>
-        {isNetworkError
-          ? "No Network Connection"
-          : "Server Unavailable"}
-      </Text>
+          <View style={styles.iconCircle}>
+            {isNetworkError ? (
+              <WifiOff size={42} color={colors.danger} />
+            ) : (
+              <Server size={42} color={colors.danger} />
+            )}
+          </View>
 
-      <Text style={styles.description}>
-        {isNetworkError
-          ? "Check your Wi-Fi or mobile network, then try again."
-          : "We couldn't reach the Habit Tracker server. Please make sure the server is running and try again."}
-      </Text>
+          <Text style={styles.title}>
+            {isNetworkError
+              ? "No Network Connection"
+              : "Server Unavailable"}
+          </Text>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Retry connection"
-        disabled={checking}
-        onPress={() => void checkConnection()}
-        style={({ pressed }) => [
-          styles.retryButton,
-          pressed && styles.retryPressed,
-          checking && styles.retryDisabled,
-        ]}
-      >
-        {checking ? (
-          <ActivityIndicator color={colors.surface} />
-        ) : (
-          <RefreshCw size={18} color={colors.surface} />
-        )}
-        <Text style={styles.retryText}>
-          {checking ? "Checking..." : "Try Again"}
-        </Text>
-      </Pressable>
+          <Text style={styles.description}>
+            {isNetworkError
+              ? "Check your Wi-Fi or mobile network, then try again."
+              : "We couldn't reach the Habit Tracker server. Please make sure the server is running and try again."}
+          </Text>
 
-      <Text style={styles.footer}>
-        Your habits haven't been deleted. Please reconnect to continue.
-      </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retry connection"
+            disabled={checking}
+            onPress={() => void checkConnection()}
+            style={({ pressed }) => [
+              styles.retryButton,
+              pressed && styles.retryPressed,
+              checking && styles.retryDisabled,
+            ]}
+          >
+            {checking ? (
+              <ActivityIndicator color={colors.surface} />
+            ) : (
+              <RefreshCw size={18} color={colors.surface} />
+            )}
+
+            <Text style={styles.retryText}>
+              {checking ? "Checking..." : "Try Again"}
+            </Text>
+          </Pressable>
+
+          <Text style={styles.footer}>
+            Your habits haven't been deleted. Please reconnect to continue.
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
+  
 
 const styles = StyleSheet.create({
   screen: {
@@ -252,4 +296,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: spacing.xl,
   },
+  overlay: {
+  position: "absolute",
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  zIndex: 10,
+  elevation: 10,
+},
 });

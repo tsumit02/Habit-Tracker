@@ -60,7 +60,6 @@ export default function LoginScreen() {
         await login(email.trim(), password);
       }
 
-      router.replace("/(tabs)");
     } catch (error) {
       Alert.alert(
         isRegistering ? "Registration failed" : "Login failed",

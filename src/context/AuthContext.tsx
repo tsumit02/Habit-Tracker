@@ -11,6 +11,7 @@ import React, {
 import {
   apiRequest,
   getToken,
+  ApiError,
   removeToken,
   saveToken,
   setUnauthorizedHandler,
@@ -39,6 +40,7 @@ type AuthContextValue = {
     password: string
   ) => Promise<void>;
   logout: () => Promise<void>;
+  validateSession: () => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(
@@ -135,6 +137,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUnauthorizedHandler(null);
     };
   }, [logout]);
+  
+  const validateSession = useCallback(async (): Promise<boolean> => {
+  try {
+    const token = await getToken();
+
+    if (!token) {
+      setUser(null);
+      setIsAuthenticated(false);
+      return true;
+    }
+
+    const result = await apiRequest<{ user: AuthUser }>("/api/auth/me");
+
+    setUser(result.user);
+    setIsAuthenticated(true);
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      await logout();
+      return true;
+    }
+
+    console.error("Session validation failed:", error);
+    return false;
+  }
+}, [logout]);
 
   return (
     <AuthContext.Provider
@@ -145,6 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        validateSession,
       }}
     >
       {children}
