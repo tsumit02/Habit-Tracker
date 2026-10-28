@@ -1,4 +1,3 @@
-
 import type { ReactNode } from "react";
 import {
   Pressable,
@@ -6,7 +5,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { colors, spacing } from "../../theme";
+import { spacing, useAppTheme } from "../../theme";
 
 type AppButtonProps = {
   title: string;
@@ -25,6 +24,8 @@ export default function AppButton({
   disabled = false,
   style,
 }: AppButtonProps) {
+  const { colors } = useAppTheme();
+
   const backgroundColor =
     variant === "primary"
       ? colors.primary

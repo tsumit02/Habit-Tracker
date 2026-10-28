@@ -1,11 +1,5 @@
-
-import {
-  Text,
-  TextInput,
-  View,
-  type TextInputProps,
-} from "react-native";
-import { colors, spacing } from "../../theme";
+import { Text, TextInput, View, type TextInputProps } from "react-native";
+import { spacing, useAppTheme } from "../../theme";
 
 type AppInputProps = TextInputProps & {
   label: string;
@@ -16,6 +10,8 @@ export default function AppInput({
   style,
   ...inputProps
 }: AppInputProps) {
+  const { colors } = useAppTheme();
+
   return (
     <View style={{ marginBottom: spacing.lg }}>
       <Text

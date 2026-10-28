@@ -1,18 +1,16 @@
-
 import {
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
   StatusBar,
   Text,
   View,
-  Alert
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Svg, { Circle } from "react-native-svg";
 import {
-  // ArrowRight,
   CalendarDays,
   Check,
   ChevronRight,
@@ -21,32 +19,18 @@ import {
 } from "lucide-react-native";
 import { useHabits } from "../../context/HabitContext";
 import { ApiError } from "../../services/api";
+import { spacing, typography, useAppTheme } from "../../theme";
+import ScenicBackground from "../../components/layout/ScenicBackground";
+import AppCard from "../../components/ui/AppCard";
 
-// const { habits, toggleHabit } = useHabits();
-
-
-
-const C = {
-  bg: "#F5F5FF",
-  ink: "#202044",
-  muted: "#8589A8",
-  purple: "#6258F5",
-  blue: "#8988FF",
-  border: "#E9E9F7",
-};
-
-function ProgressRing({
-  percentage,
-}: {
-  percentage: number;
-}) {
+function ProgressRing({ percentage }: { percentage: number }) {
   const size = 112;
   const stroke = 10;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
 
   return (
-    <View className="items-center justify-center">
+    <View style={{ alignItems: "center", justifyContent: "center" }}>
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <Circle
           cx={size / 2}
@@ -72,11 +56,17 @@ function ProgressRing({
         />
       </Svg>
 
-      <View className="absolute items-center justify-center">
-        <Text className="text-[27px] font-extrabold text-white">
+      <View
+        style={{
+          position: "absolute",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Text style={{ color: "#FFFFFF", fontSize: 27, fontWeight: "800" }}>
           {percentage}%
         </Text>
-        <Text className="text-[10px] font-medium text-white/80">
+        <Text style={{ color: "rgba(255,255,255,0.82)", fontSize: 10 }}>
           completed
         </Text>
       </View>
@@ -87,32 +77,27 @@ function ProgressRing({
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { habits, toggleHabit } = useHabits();
+  const { colors, isDark } = useAppTheme();
 
   const handleToggleHabit = async (habitId: string) => {
-  try {
-    await toggleHabit(habitId);
-  } catch (error) {
-    console.error("[Habits] Toggle failed:", error);
+    try {
+      await toggleHabit(habitId);
+    } catch (error) {
+      console.error("[Habits] Toggle failed:", error);
 
-    Alert.alert(
-      "Couldn't update habit",
-      error instanceof ApiError
-        ? error.message
-        : "We couldn't update your progress. Please try again."
-    );
-  }
-};
+      Alert.alert(
+        "Couldn't update habit",
+        error instanceof ApiError
+          ? error.message
+          : "We couldn't update your progress. Please try again.",
+      );
+    }
+  };
 
-  const completedCount = habits.filter(
-    (habit) => habit.completed
-  ).length;
-
+  const completedCount = habits.filter((habit) => habit.completed).length;
   const totalCount = habits.length;
-
   const percentage =
-    totalCount === 0
-      ? 0
-      : Math.round((completedCount / totalCount) * 100);
+    totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
 
   const formattedDate = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
@@ -120,199 +105,394 @@ export default function HomeScreen() {
     month: "long",
   });
 
+  const tileColors = isDark
+    ? ["#353C56", "#493B36", "#403752", "#493344", "#2D4844"]
+    : ["#E1F4FF", "#FFF0DC", "#EDE6FF", "#FFE6EF", "#DDF8EF"];
+
   return (
-    <SafeAreaView className="flex-1 bg-[#F5F5FF]">
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
       <StatusBar
-        barStyle="dark-content"
-        backgroundColor={C.bg}
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={colors.background}
       />
 
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: Math.max(insets.top, 8) + 4,
-          paddingBottom: 30,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View className="mb-6 flex-row items-center justify-between">
-          <View className="flex-1">
-            <Text className="text-sm font-medium text-[#8589A8]">
-              Good day to grow 🌱
-            </Text>
-
-            <Text className="mt-1 text-[29px] font-extrabold tracking-tight text-[#202044]">
-              Hello, there 👋
-            </Text>
-
-            <View className="mt-2 flex-row items-center">
-              <CalendarDays
-                size={14}
-                color={C.muted}
-                strokeWidth={2}
-              />
-              <Text className="ml-2 text-xs text-[#8589A8]">
-                {formattedDate}
-              </Text>
-            </View>
-          </View>
-
-          <Pressable
-            onPress={() => router.push("/about")}
-            accessibilityRole="button"
-            accessibilityLabel="About Habit Tracker"
-            className="h-[52px] w-[52px] items-center justify-center rounded-[19px] border border-white bg-[#E6E6FF]"
+      <ScenicBackground height={315}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.screenHorizontal,
+            paddingTop: Math.max(insets.top, 8) + 8,
+            paddingBottom: 125 + insets.bottom,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Scenic header */}
+          <View
             style={{
-              shadowColor: "#6258F5",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.09,
-              shadowRadius: 10,
-              elevation: 2,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 24,
             }}
           >
-            <Text className="text-[25px] font-extrabold text-[#6258F5]">
-              H
-            </Text>
-          </Pressable>
-        </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: isDark ? "#F0EAFE" : "#514B78",
+                  fontSize: 13,
+                  fontWeight: "600",
+                }}
+              >
+                A little progress every day 🌱
+              </Text>
 
-        {/* Glass-inspired progress card */}
-        <View
-          className="mb-7 overflow-hidden rounded-[30px] border border-white bg-[#7167FA] p-5"
-          style={{
-            shadowColor: "#6258F5",
-            shadowOffset: { width: 0, height: 9 },
-            shadowOpacity: 0.20,
-            shadowRadius: 18,
-            elevation: 6,
-          }}
-        >
-          {/* Decorative pastel shapes */}
-          <View
-            pointerEvents="none"
-            className="absolute -right-8 -top-12 h-40 w-40 rounded-full bg-[#B5C5FF]"
-            style={{ opacity: 0.35 }}
-          />
-          <View
-            pointerEvents="none"
-            className="absolute -bottom-14 -left-8 h-36 w-36 rounded-full bg-[#D6B9FF]"
-            style={{ opacity: 0.35 }}
-          />
+              <Text
+                style={{
+                  color: isDark ? "#FFFFFF" : "#282548",
+                  fontSize: 30,
+                  fontWeight: "800",
+                  letterSpacing: -0.8,
+                  marginTop: 5,
+                }}
+              >
+                Hello, there 👋
+              </Text>
 
-          <View className="mb-6 flex-row items-center justify-between">
-            <View className="flex-row items-center">
-              <View className="h-9 w-9 items-center justify-center rounded-xl bg-white/20">
-                <Sparkles color="#FFFFFF" size={19} />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginTop: 9,
+                }}
+              >
+                <CalendarDays
+                  size={15}
+                  color={isDark ? "#E3DFFF" : "#5E5A82"}
+                />
+                <Text
+                  style={{
+                    color: isDark ? "#E3DFFF" : "#5E5A82",
+                    fontSize: 12,
+                    marginLeft: 7,
+                    fontWeight: "500",
+                  }}
+                >
+                  {formattedDate}
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              onPress={() => router.push("/about")}
+              accessibilityRole="button"
+              accessibilityLabel="About Habit Tracker"
+              style={{
+                width: 50,
+                height: 50,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor: isDark
+                  ? "rgba(255,255,255,0.25)"
+                  : "rgba(255,255,255,0.9)",
+                backgroundColor: isDark
+                  ? "rgba(34,34,59,0.85)"
+                  : "rgba(255,255,255,0.82)",
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.primary,
+                  fontSize: 24,
+                  fontWeight: "800",
+                }}
+              >
+                H
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Daily progress */}
+          <View
+            style={{
+              marginBottom: 28,
+              padding: 20,
+              borderRadius: 28,
+              overflow: "hidden",
+              backgroundColor: isDark ? "#51468F" : "#7167F5",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.35)",
+              shadowColor: "#5147D9",
+              shadowOffset: { width: 0, height: 7 },
+              shadowOpacity: 0.18,
+              shadowRadius: 16,
+              elevation: 5,
+            }}
+          >
+            <View
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                width: 150,
+                height: 150,
+                borderRadius: 75,
+                right: -55,
+                top: -65,
+                backgroundColor: "#B9C7FF",
+                opacity: 0.25,
+              }}
+            />
+
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 22,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 12,
+                    backgroundColor: "rgba(255,255,255,0.19)",
+                  }}
+                >
+                  <Sparkles color="#FFFFFF" size={19} />
+                </View>
+                <Text
+                  style={{
+                    color: "#FFFFFF",
+                    fontSize: 11,
+                    fontWeight: "800",
+                    letterSpacing: 1,
+                    marginLeft: 10,
+                  }}
+                >
+                  YOUR DAILY JOURNEY
+                </Text>
               </View>
 
-              <Text className="ml-3 text-[12px] font-bold tracking-[1.2px] text-white">
-                YOUR DAILY JOURNEY
+              <View
+                style={{
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.35)",
+                  backgroundColor: "rgba(255,255,255,0.13)",
+                  paddingHorizontal: 11,
+                  paddingVertical: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#FFFFFF",
+                    fontSize: 10,
+                    fontWeight: "700",
+                  }}
+                >
+                  TODAY
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <ProgressRing percentage={percentage} />
+
+              <View style={{ marginLeft: 18, flex: 1 }}>
+                <Text
+                  style={{
+                    color: "#FFFFFF",
+                    fontSize: 22,
+                    fontWeight: "800",
+                  }}
+                >
+                  {totalCount > 0 && percentage === 100
+                    ? "Amazing work!"
+                    : "Keep growing!"}
+                </Text>
+
+                <Text
+                  style={{
+                    color: "rgba(255,255,255,0.9)",
+                    fontSize: 13,
+                    lineHeight: 20,
+                    marginTop: 7,
+                  }}
+                >
+                  {completedCount} of {totalCount} habits completed
+                </Text>
+
+                <Text
+                  style={{
+                    color: "rgba(255,255,255,0.8)",
+                    fontSize: 11,
+                    lineHeight: 17,
+                    marginTop: 8,
+                  }}
+                >
+                  {percentage === 100 && totalCount > 0
+                    ? "You showed up for yourself today! 🎉"
+                    : "Little steps create big changes ✨"}
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={{
+                height: 1,
+                backgroundColor: "rgba(255,255,255,0.22)",
+                marginTop: 22,
+              }}
+            />
+
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginTop: 14,
+              }}
+            >
+              <Text
+                style={{ color: "rgba(255,255,255,0.9)", fontSize: 12 }}
+              >
+                Daily consistency
+              </Text>
+              <Text
+                style={{ color: "#FFFFFF", fontSize: 12, fontWeight: "700" }}
+              >
+                {completedCount}/{totalCount} completed
+              </Text>
+            </View>
+          </View>
+
+          {/* Today's habits */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 17,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: colors.text,
+                  fontSize: 24,
+                  fontWeight: "800",
+                  letterSpacing: -0.6,
+                }}
+              >
+                Today's habits
+              </Text>
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontSize: 13,
+                  marginTop: 5,
+                }}
+              >
+                Small steps make big changes.
               </Text>
             </View>
 
-            <View className="rounded-full border border-white/30 bg-white/15 px-3 py-1.5">
-              <Text className="text-[10px] font-semibold text-white">
-                TODAY
+            <View
+              style={{
+                marginLeft: 10,
+                borderRadius: 15,
+                backgroundColor: colors.primaryLight,
+                paddingHorizontal: 14,
+                paddingVertical: 11,
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.primary,
+                  fontSize: 15,
+                  fontWeight: "800",
+                }}
+              >
+                {completedCount}/{totalCount}
               </Text>
             </View>
           </View>
 
-          <View className="flex-row items-center">
-            <ProgressRing percentage={percentage} />
+          {/* Empty state */}
+          {totalCount === 0 && (
+            <AppCard
+              style={{
+                alignItems: "center",
+                marginBottom: 14,
+                paddingVertical: 28,
+              }}
+            >
+              <View
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 24,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: colors.primaryLight,
+                  marginBottom: 15,
+                }}
+              >
+                <Text style={{ fontSize: 34 }}>🌱</Text>
+              </View>
 
-            <View className="ml-5 flex-1">
-              <Text className="text-[23px] font-extrabold text-white">
-                {totalCount > 0 && percentage === 100
-                  ? "Amazing work!"
-                  : "Keep growing!"}
+              <Text
+                style={{
+                  color: colors.text,
+                  fontSize: 18,
+                  fontWeight: "800",
+                }}
+              >
+                Start something wonderful
               </Text>
 
-              <Text className="mt-2 text-sm leading-5 text-white/90">
-                {completedCount} of {totalCount} habits completed
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  textAlign: "center",
+                  fontSize: 13,
+                  lineHeight: 21,
+                  marginTop: 8,
+                }}
+              >
+                Create your first habit and begin building your daily routine.
               </Text>
+            </AppCard>
+          )}
 
-              <Text className="mt-3 text-xs leading-5 text-white/80">
-                {percentage === 100 && totalCount > 0
-                  ? "You showed up for yourself today! 🎉"
-                  : "Little steps create big changes ✨"}
-              </Text>
-            </View>
-          </View>
-
-          <View className="mt-6 h-px bg-white/20" />
-
-          <View className="mt-4 flex-row items-center justify-between">
-            <Text className="text-xs text-white/90">
-              Daily consistency
-            </Text>
-
-            <Text className="text-xs font-bold text-white">
-              {completedCount}/{totalCount} completed
-            </Text>
-          </View>
-        </View>
-
-        {/* Today's habits */}
-        <View className="mb-5 flex-row items-center justify-between">
-          <View className="flex-1">
-            <Text className="text-[24px] font-extrabold tracking-tight text-[#202044]">
-              Today's habits
-            </Text>
-
-            <Text className="mt-1.5 text-sm text-[#8589A8]">
-              Small steps make big changes.
-            </Text>
-          </View>
-
-          <View className="ml-3 rounded-2xl border border-white bg-[#E9E8FF] px-4 py-3">
-            <Text className="text-base font-extrabold text-[#6258F5]">
-              {completedCount}/{totalCount}
-            </Text>
-          </View>
-        </View>
-
-        {/* Empty state */}
-        {totalCount === 0 && (
-          <View className="mb-4 items-center rounded-[26px] border border-white bg-white/90 px-6 py-8">
-            <View className="mb-4 h-[76px] w-[76px] items-center justify-center rounded-[26px] bg-[#F0EAFE]">
-              <Text className="text-[36px]">🌱</Text>
-            </View>
-
-            <Text className="text-lg font-bold text-[#202044]">
-              Start something wonderful
-            </Text>
-
-            <Text className="mt-2 text-center text-sm leading-6 text-[#8589A8]">
-              Create your first habit and begin building your daily routine.
-            </Text>
-          </View>
-        )}
-
-        {/* Habit cards */}
-        {habits.map((habit, index) => {
-          const tileColors = [
-            "#E1F4FF",
-            "#FFF0DC",
-            "#EDE6FF",
-            "#FFE6EF",
-            "#DDF8EF",
-          ];
-
-          return (
+          {/* Habit list */}
+          {habits.map((habit, index) => (
             <View
               key={habit.id}
-              className={`mb-3 flex-row items-center rounded-[25px] border p-3.5 ${
-                habit.completed
-                  ? "border-[#D4F0E1] bg-[#F6FFF9]"
-                  : "border-white bg-white"
-              }`}
               style={{
-                shadowColor: "#56558C",
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 11,
+                padding: 12,
+                borderRadius: 23,
+                borderWidth: 1,
+                borderColor: habit.completed
+                  ? colors.successLight
+                  : colors.border,
+                backgroundColor: habit.completed
+                  ? colors.successLight
+                  : colors.surface,
+                shadowColor: "#454064",
                 shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.045,
-                shadowRadius: 9,
+                shadowOpacity: isDark ? 0.08 : 0.035,
+                shadowRadius: 8,
                 elevation: 2,
               }}
             >
@@ -325,14 +505,18 @@ export default function HomeScreen() {
                 }
                 accessibilityRole="button"
                 accessibilityLabel={`Edit ${habit.title}`}
-                className="h-[55px] w-[55px] items-center justify-center rounded-[19px]"
                 style={{
+                  width: 54,
+                  height: 54,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 18,
                   backgroundColor: habit.completed
-                    ? "#DDF6E8"
+                    ? colors.successLight
                     : tileColors[index % tileColors.length],
                 }}
               >
-                <Text className="text-[27px]">{habit.emoji}</Text>
+                <Text style={{ fontSize: 26 }}>{habit.emoji}</Text>
               </Pressable>
 
               <Pressable
@@ -343,28 +527,46 @@ export default function HomeScreen() {
                   })
                 }
                 accessibilityRole="button"
-                className="ml-3.5 flex-1 justify-center py-1"
+                accessibilityLabel={`Edit ${habit.title}`}
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  marginLeft: 12,
+                  paddingVertical: 4,
+                }}
               >
                 <Text
                   numberOfLines={1}
-                  className={`text-[15px] font-bold ${
-                    habit.completed
-                      ? "text-[#39845D]"
-                      : "text-[#242442]"
-                  }`}
+                  style={{
+                    color: habit.completed ? colors.success : colors.text,
+                    fontSize: 15,
+                    fontWeight: "700",
+                  }}
                 >
                   {habit.title}
                 </Text>
 
                 <Text
                   numberOfLines={2}
-                  className="mt-1 text-xs leading-5 text-[#8589A8]"
+                  style={{
+                    color: colors.textSecondary,
+                    fontSize: 12,
+                    lineHeight: 18,
+                    marginTop: 4,
+                  }}
                 >
                   {habit.subtitle}
                 </Text>
 
                 {habit.completed && (
-                  <Text className="mt-1 text-[10px] font-semibold text-[#39845D]">
+                  <Text
+                    style={{
+                      color: colors.success,
+                      fontSize: 10,
+                      fontWeight: "700",
+                      marginTop: 4,
+                    }}
+                  >
                     Completed today
                   </Text>
                 )}
@@ -377,16 +579,31 @@ export default function HomeScreen() {
                   habit.completed ? "incomplete" : "complete"
                 }`}
                 accessibilityState={{ checked: habit.completed }}
-                className={`ml-2 h-10 w-10 items-center justify-center rounded-full ${
-                  habit.completed
-                    ? "bg-[#2FBD76]"
-                    : "border-2 border-[#D8DBEA] bg-[#FAFAFF]"
-                }`}
+                style={{
+                  width: 38,
+                  height: 38,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 19,
+                  marginLeft: 8,
+                  backgroundColor: habit.completed
+                    ? colors.success
+                    : colors.surfaceSecondary,
+                  borderWidth: habit.completed ? 0 : 1.5,
+                  borderColor: colors.border,
+                }}
               >
                 {habit.completed ? (
-                  <Check size={21} color="#FFFFFF" strokeWidth={3} />
+                  <Check size={20} color="#FFFFFF" strokeWidth={3} />
                 ) : (
-                  <View className="h-2 w-2 rounded-full bg-[#D8DBEA]" />
+                  <View
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 4,
+                      backgroundColor: colors.textMuted,
+                    }}
+                  />
                 )}
               </Pressable>
 
@@ -399,64 +616,60 @@ export default function HomeScreen() {
                 }
                 accessibilityRole="button"
                 accessibilityLabel={`Edit ${habit.title}`}
-                className="ml-1 p-1"
+                style={{ padding: 6, marginLeft: 2 }}
               >
-                <ChevronRight size={19} color="#A2A6C0" />
+                <ChevronRight size={19} color={colors.textMuted} />
               </Pressable>
             </View>
-          );
-        })}
+          ))}
 
-        {/* Add habit */}
-        <Pressable
-          onPress={() => router.push("/add-habit")}
-          accessibilityRole="button"
-          className="mt-2 flex-row items-center justify-center rounded-[23px] bg-[#6258F5] px-5 py-[18px]"
-          style={{
-            shadowColor: "#6258F5",
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.20,
-            shadowRadius: 12,
-            elevation: 4,
-          }}
-        >
-          <Plus size={21} color="#FFFFFF" strokeWidth={2.5} />
-
-          <Text className="ml-2 text-[15px] font-bold text-white">
-            Add a new habit
-          </Text>
-        </Pressable>
-
-        {/* Progress shortcut
-        <Pressable
-          onPress={() => router.push("/progress")}
-          accessibilityRole="button"
-          className="mt-4 flex-row items-center rounded-[24px] border border-white bg-white/90 p-4"
-        >
-          <View className="h-12 w-12 items-center justify-center rounded-[17px] bg-[#EAE8FF]">
-            <Text className="text-[23px]">📈</Text>
-          </View>
-
-          <View className="ml-3 flex-1">
-            <Text className="text-[15px] font-bold text-[#242442]">
-              Your progress
+          {/* Add habit */}
+          <Pressable
+            onPress={() => router.push("/add-habit")}
+            accessibilityRole="button"
+            style={({ pressed }) => ({
+              minHeight: 57,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 5,
+              paddingHorizontal: 20,
+              borderRadius: 21,
+              backgroundColor: colors.primary,
+              opacity: pressed ? 0.86 : 1,
+              shadowColor: colors.primary,
+              shadowOffset: { width: 0, height: 5 },
+              shadowOpacity: 0.2,
+              shadowRadius: 10,
+              elevation: 4,
+            })}
+          >
+            <Plus size={21} color="#FFFFFF" strokeWidth={2.5} />
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 15,
+                fontWeight: "800",
+                marginLeft: 9,
+              }}
+            >
+              Add a new habit
             </Text>
+          </Pressable>
 
-            <Text className="mt-1 text-xs text-[#8589A8]">
-              Look how far you've come
+          <View style={{ alignItems: "center", marginTop: 25 }}>
+            <Text
+              style={{
+                color: colors.textMuted,
+                fontSize: 12,
+                fontWeight: "500",
+              }}
+            >
+              Made for your growth 💜
             </Text>
           </View>
-
-          <ArrowRight size={19} color={C.purple} />
-        </Pressable> */}
-
-        {/* Footer */}
-        <View className="mt-7 items-center">
-          <Text className="text-xs font-medium text-[#969AB4]">
-            Made for your growth 💜
-          </Text>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </ScenicBackground>
     </SafeAreaView>
   );
 }

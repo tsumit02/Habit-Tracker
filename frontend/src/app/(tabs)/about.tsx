@@ -1,84 +1,58 @@
 import { useState } from "react";
-import { Alert, ScrollView, Text, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   CheckCircle2,
-  Flame,
   Heart,
   LogOut,
-  Repeat2,
+  ShieldCheck,
   Sparkles,
-  Target,
+  UserRound,
 } from "lucide-react-native";
 
-import { AppCard, AppButton } from "../../components/ui";
 import { useAuth } from "../../context/AuthContext";
 import { colors, spacing } from "../../theme";
 import styles from "../../styles/about.styles";
 
-const features = [
-  {
-    title: "Build consistent habits",
-    description:
-      "Create daily routines and turn small actions into lasting habits.",
-    icon: Target,
-    color: colors.primary,
-    background: colors.primaryLight,
-  },
-  {
-    title: "Track your progress",
-    description:
-      "See your completed habits, weekly activity, and consistency over time.",
-    icon: CheckCircle2,
-    color: colors.success,
-    background: colors.successLight,
-  },
-  {
-    title: "Keep your streak alive",
-    description:
-      "Celebrate your daily wins and stay motivated to keep going.",
-    icon: Flame,
-    color: colors.orange,
-    background: colors.orangeLight,
-  },
-  {
-    title: "Make progress your way",
-    description:
-      "Choose your habit schedules and build a routine that fits your life.",
-    icon: Repeat2,
-    color: colors.pink,
-    background: colors.pinkLight,
-  },
-];
-
 export default function AboutScreen() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  const initials =
+    user?.name
+      ?.trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join("") || "";
+
   const handleLogout = () => {
-    Alert.alert(
-      "Log out",
-      "Are you sure you want to log out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Log out",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setIsLoggingOut(true);
-              await logout();
-            } catch (error) {
-              console.error("Logout failed:", error);
-              Alert.alert("Error", "Unable to log out. Please try again.");
-            } finally {
-              setIsLoggingOut(false);
-            }
-          },
+    Alert.alert("Log out", "Are you sure you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log out",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setIsLoggingOut(true);
+            await logout();
+          } catch (error) {
+            console.error("Logout failed:", error);
+            Alert.alert("Error", "Unable to log out. Please try again.");
+          } finally {
+            setIsLoggingOut(false);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
+
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <ScrollView
@@ -86,95 +60,155 @@ export default function AboutScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>About Habit Tracker</Text>
+          <Text style={styles.eyebrow}>YOUR PERSONAL SPACE</Text>
+          <Text style={styles.title}>Profile & About</Text>
           <Text style={styles.subtitle}>
-            A little progress every day adds up to big changes.
+            Your habit journey, all in one place.
           </Text>
         </View>
 
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Sparkles size={30} color={colors.surface} />
+        {/* Profile */}
+        <View style={styles.profileCard}>
+          <View style={styles.avatar}>
+            {initials ? (
+              <Text style={styles.avatarText}>{initials}</Text>
+            ) : (
+              <UserRound size={32} color={colors.primary} />
+            )}
           </View>
 
-          <Text style={styles.heroTitle}>
-            Small steps. Big changes.
-          </Text>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName} numberOfLines={2}>
+              {user?.name?.trim() || "Your profile"}
+            </Text>
+            <Text style={styles.profileEmail} numberOfLines={2}>
+              {user?.email || "Account information unavailable"}
+            </Text>
 
-          <Text style={styles.heroDescription}>
-            Your personal space to create better routines, celebrate
-            small wins, and become more consistent one day at a time.
-          </Text>
+            <View style={styles.memberBadge}>
+              <Sparkles size={14} color={colors.primary} />
+              <Text style={styles.memberBadgeText}>Habit Builder</Text>
+            </View>
+          </View>
         </View>
 
-        <Text style={styles.sectionTitle}>What you can do</Text>
+        {/* Your journey */}
+        <Text style={styles.sectionTitle}>Your journey</Text>
 
-        <AppCard style={styles.featureCard}>
-          {features.map((feature, index) => {
-            const Icon = feature.icon;
-            const isLast = index === features.length - 1;
+        <View style={styles.sectionCard}>
+          <View style={styles.menuRow}>
+            <View style={styles.iconPurple}>
+              <UserRound size={21} color={colors.primary} />
+            </View>
+            <View style={styles.menuText}>
+              <Text style={styles.menuTitle}>
+                Personal information
+              </Text>
+              <Text style={styles.menuDescription}>
+                {user?.name?.trim()
+                  ? `Growing every day, ${user.name.trim().split(/\s+/)[0]}.`
+                  : "Your account details will appear here."}
+              </Text>
+            </View>
+          </View>
 
-            return (
-              <View
-                key={feature.title}
-                style={[
-                  styles.featureRow,
-                  isLast && styles.featureRowLast,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.featureIcon,
-                    { backgroundColor: feature.background },
-                  ]}
-                >
-                  <Icon size={23} color={feature.color} />
-                </View>
+          <View style={styles.separator} />
 
-                <View style={styles.featureText}>
-                  <Text style={styles.featureTitle}>
-                    {feature.title}
-                  </Text>
-                  <Text style={styles.featureDescription}>
-                    {feature.description}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </AppCard>
+          <View style={styles.menuRow}>
+            <View style={styles.iconGreen}>
+              <CheckCircle2 size={21} color={colors.success} />
+            </View>
+            <View style={styles.menuText}>
+              <Text style={styles.menuTitle}>
+                Consistency matters
+              </Text>
+              <Text style={styles.menuDescription}>
+                Build small routines and celebrate your daily progress.
+              </Text>
+            </View>
+          </View>
+        </View>
 
+        {/* About the app */}
+        <Text style={styles.sectionTitle}>About the app</Text>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.menuRow}>
+            <View style={styles.iconPink}>
+              <Heart size={21} color={colors.pink} />
+            </View>
+            <View style={styles.menuText}>
+              <Text style={styles.menuTitle}>Habit Tracker</Text>
+              <Text style={styles.menuDescription}>
+                Build consistency, one day at a time.
+              </Text>
+            </View>
+            <View style={styles.versionBadge}>
+              <Text style={styles.versionText}>v1.0.0</Text>
+            </View>
+          </View>
+
+          <View style={styles.separator} />
+
+          <View style={styles.menuRow}>
+            <View style={styles.iconBlue}>
+              <ShieldCheck size={21} color={colors.blue} />
+            </View>
+            <View style={styles.menuText}>
+              <Text style={styles.menuTitle}>
+                Progress over perfection
+              </Text>
+              <Text style={styles.menuDescription}>
+                Small actions today create better habits tomorrow.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Motivation */}
         <View style={styles.motivationCard}>
-          <Heart size={25} color={colors.primary} />
-
+          <View style={styles.motivationIcon}>
+            <Sparkles size={24} color={colors.primary} />
+          </View>
           <Text style={styles.motivationTitle}>
-            Progress over perfection
+            Every little win counts.
           </Text>
-
           <Text style={styles.motivationText}>
             You don't have to be perfect. Just keep showing up for
             yourself, one small step at a time.
           </Text>
         </View>
-        <View style={{ marginTop: spacing.md, marginBottom: spacing.xl }}>
-  <AppButton
-    title={isLoggingOut ? "Logging out..." : "Log out"}
-    onPress={handleLogout}
-    disabled={isLoggingOut}
-    variant="danger"
-    icon={<LogOut size={18} color={colors.danger} />}
-  />
-</View>
+
+        {/* Logout */}
+        <View style={styles.logoutCard}>
+          <View style={styles.logoutIcon}>
+            <LogOut size={20} color={colors.danger} />
+          </View>
+
+          <View style={styles.logoutText}>
+            <Text style={styles.menuTitle}>Your account</Text>
+            <Text style={styles.menuDescription}>
+              Sign out of Habit Tracker.
+            </Text>
+          </View>
+
+          <Text
+            accessibilityRole="button"
+            onPress={isLoggingOut ? undefined : handleLogout}
+            style={[
+              styles.logoutButtonText,
+              isLoggingOut && styles.disabledLogout,
+            ]}
+          >
+            {isLoggingOut ? "Please wait..." : "Log out"}
+          </Text>
+        </View>
+
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             Made for your everyday growth
           </Text>
-          <Text
-            style={[
-              styles.footerText,
-              { marginTop: spacing.xs },
-            ]}
-          >
+          <Text style={styles.footerText}>
             Habit Tracker · Keep growing
           </Text>
         </View>

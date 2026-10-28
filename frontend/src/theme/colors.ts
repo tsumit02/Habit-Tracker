@@ -1,35 +1,58 @@
-const colors = {
-  background: "#F5F5FF",
+export const lightColors = {
+  background: "#F5F3FF",
   surface: "#FFFFFF",
-  surfaceSecondary: "#FAFAFF",
-
-  primary: "#6258F5",
-  primaryLight: "#EAE8FF",
-  primaryDark: "#4940D4",
-
-  text: "#252344",
-  textSecondary: "#8587A6",
-  textMuted: "#A5A6BB",
-
-  border: "#E9E8F6",
-
+  surfaceSecondary: "#F9F8FF",
+  primary: "#7167F5",
+  primaryLight: "#EAE7FF",
+  primaryDark: "#5147D9",
+  text: "#242344",
+  textSecondary: "#8585A3",
+  textMuted: "#A5A4BA",
+  border: "#E8E5F5",
   success: "#25986B",
   successLight: "#E2F6ED",
-
   danger: "#D94C61",
   dangerLight: "#FFF0F1",
-
   blue: "#5797F5",
-  blueLight: "#E8F5FF",
-
+  blueLight: "#E8F2FF",
   orange: "#F0A34A",
   orangeLight: "#FFF0D9",
-
   pink: "#E875A5",
   pinkLight: "#FFE8ED",
-
   lavender: "#9B8AFB",
   lavenderLight: "#F0E9FF",
+  tabBar: "#FFFFFF",
+  tabInactive: "#A6A2C8",
+  overlay: "rgba(255,255,255,0.12)",
 };
 
+export const darkColors = {
+  background: "#17172B",
+  surface: "#22223B",
+  surfaceSecondary: "#2A2945",
+  primary: "#A69BFF",
+  primaryLight: "#393458",
+  primaryDark: "#C2B9FF",
+  text: "#F4F1FF",
+  textSecondary: "#B5B2D0",
+  textMuted: "#8D8AA9",
+  border: "#383653",
+  success: "#62D6A0",
+  successLight: "#233F39",
+  danger: "#FF8292",
+  dangerLight: "#452A39",
+  blue: "#83B7FF",
+  blueLight: "#263950",
+  orange: "#FFC078",
+  orangeLight: "#47382F",
+  pink: "#FFA4C7",
+  pinkLight: "#472B42",
+  lavender: "#B9ABFF",
+  lavenderLight: "#35304F",
+  tabBar: "#1E1D35",
+  tabInactive: "#9995B8",
+  overlay: "rgba(12,10,32,0.38)",
+};
+
+const colors = lightColors;
 export default colors;

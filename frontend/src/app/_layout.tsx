@@ -1,14 +1,12 @@
+
 import "../../global.css";
 import { useEffect } from "react";
-import {
-  Stack,
-  usePathname,
-  useRouter,
-} from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
 
 import { HabitProvider } from "../context/HabitContext";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import ConnectionGate from "../components/ConnectionGate";
+import { ThemeProvider } from "../theme/ThemeProvider";
 
 function RouteGuard() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -34,12 +32,14 @@ function RouteGuard() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <HabitProvider>
-        <ConnectionGate>
-          <RouteGuard />
-        </ConnectionGate>
-      </HabitProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <HabitProvider>
+          <ConnectionGate>
+            <RouteGuard />
+          </ConnectionGate>
+        </HabitProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

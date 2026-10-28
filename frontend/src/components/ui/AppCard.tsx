@@ -1,10 +1,6 @@
 import type { ReactNode } from "react";
-import {
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
-import { colors, spacing } from "../../theme";
+import { View, type StyleProp, type ViewStyle } from "react-native";
+import { spacing, useAppTheme } from "../../theme";
 
 type AppCardProps = {
   children: ReactNode;
@@ -17,6 +13,8 @@ export default function AppCard({
   style,
   padding = spacing.cardPadding,
 }: AppCardProps) {
+  const { colors } = useAppTheme();
+
   return (
     <View
       style={[

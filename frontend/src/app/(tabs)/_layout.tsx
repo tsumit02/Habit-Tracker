@@ -1,34 +1,42 @@
-
 import { Tabs } from "expo-router";
 import {
   House,
   ChartNoAxesCombined,
   Info,
 } from "lucide-react-native";
-
-const COLORS = {
-  primary: "#5965C9",
-  inactive: "#9296A6",
-  background: "#FFFFFF",
-  border: "#EEF0F6",
-};
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppTheme } from "../../theme/ThemeProvider";
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const { colors } = useAppTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.inactive,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.tabInactive,
         tabBarStyle: {
-          backgroundColor: COLORS.background,
-          borderTopColor: COLORS.border,
+          position: "absolute",
+          left: 14,
+          right: 14,
+          bottom: Math.max(insets.bottom > 0 ? 6 : 12, 6),
+          height: 62 + Math.max(insets.bottom - 4, 0),
+          paddingTop: 7,
+          paddingBottom: Math.max(
+            insets.bottom > 0 ? insets.bottom - 2 : 8,
+            8,
+          ),
+          backgroundColor: colors.tabBar,
+          borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 68,
-          paddingTop: 8,
-          paddingBottom: 8,
-          elevation: 0,
-          shadowOpacity: 0,
+          borderRadius: 22,
+          elevation: 8,
+          shadowColor: "#000000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 12,
         },
         tabBarLabelStyle: {
           fontSize: 11,
